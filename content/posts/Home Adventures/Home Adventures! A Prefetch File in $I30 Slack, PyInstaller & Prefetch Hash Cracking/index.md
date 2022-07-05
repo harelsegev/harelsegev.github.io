@@ -35,7 +35,7 @@ This Prefetch file must have been created because I executed Floss, which is a t
 
 
 
-The prefetch file was created at 23:14:57, probably right after `floss64.exe` was first executed. We can also see a last modification time at 23:25:35. If I were to find this Prefetch file in the MFT, and this last modification timestamp were from `$STANDATD_INFORMATION`, I would say that it indicates the last execution time of `floss64.exe`. However, this timestamp is from $I30 slack, so this might not be the case.
+The Prefetch file was created at 23:14:57, probably right after `floss64.exe` was first executed. We can also see a last modification time at 23:25:35. If I were to find this Prefetch file in the MFT, and this last modification timestamp were from `$STANDATD_INFORMATION`, I would say that it indicates the last execution time of `floss64.exe`. However, this timestamp is from $I30 slack, so this might not be the case.
 
 I know what you think - $I30 timestamps should mirror those in the `$STANDATD_INFORMATION` attribute! And you are absolutely right. But $I30 entries, as opposed to MFT entries, can move around throughout their lifetime. When a file is created or deleted in a directory, $I30 entries of other files in the directory may be unallocated, and then reallocated in a different place. This entry could have been unallocated while the Prefetch file was still active! In this case, the entry may contain outdated information.
 
@@ -55,7 +55,7 @@ There are also details about its inner workings:
 
 At 23:28:52, The folder `_MEI86322` was created in my user's `Temp` directory, which indicates I executed a PyInstaller executable. INDXRipper was kind enough to parse the $I30 of this folder for us, so we can see a compiled python module (.pyd file) that was created inside the folder and deleted since.
 
-My guess is that `floss64.exe` was first executed at 23:14:57, then executed again in 23:25:35, and then again in 23:28:52. The $I30 entry we found in slack space was unallocated somewhere between 23:25:35 and 23:28:52, so the last modification time wasn't updated the next time `floss64.exe` was executed.
+My guess is that `floss64.exe` was first executed at 23:14:57, then executed again at 23:25:35, and then again at 23:28:52. The $I30 entry we found in slack space was unallocated somewhere between 23:25:35 and 23:28:52, so the last modification time wasn't updated the next time `floss64.exe` was executed.
 
 An interesting thing to note, is that we only see a single `_MEI*xxxxxx*` folder; yet, we know a unique one should have been created for every execution of `floss64.exe`.
 
