@@ -1,0 +1,66 @@
+baseURL: "http://harelsegev.github.io/"
+title: "RAT In Mi Kitchen"
+paginate: 5
+theme: "PaperMod"
+publishDir: "docs"
+
+params:
+  title: "RAT In Mi Kitchen"
+  keywords: ["Blog", "DFIR"]
+  DateFormat: "January 2, 2006"
+  author: "Harel Segev"
+  defaultTheme: auto
+  disableThemeToggle: false
+
+  ShowReadingTime: true
+  ShowShareButtons: true
+  ShowPostNavLinks: true
+  ShowBreadCrumbs: true
+  ShowCodeCopyButtons: false
+  ShowWordCount: true
+  ShowRssButtonInSectionTermList: true
+  ShowFullTextinRSS: true
+  UseHugoToc: true
+  disableSpecial1stPost: false
+  disableScrollToTop: false
+  comments: true
+  hidemeta: false
+  hideSummary: false
+  showtoc: false
+  tocopen: false
+  
+  # home-info mode
+  homeInfoParams:
+    Title: "RAT In Mi Kitchen"
+    Content: "A place for all my DFIR ramblings"
+
+  socialIcons:
+    - name: github
+      url: "https://github.com/harelsegev"
+    - name: rss
+      url: "https://harelsegev.github.io/index.xml"
+
+menu:
+  main:
+    - identifier: posts
+      name: posts
+      url: /posts/
+      weight: 10
+    - identifier: tags
+      name: tags
+      url: /tags/
+      weight: 20
+    - identifier: search
+      name: search
+      url: /search/
+      weight: 30
+    - identifier: archives
+      name: archive
+      url: /archives/
+      weight: 40
+
+outputs:
+  home:
+    - HTML
+    - RSS
+    - JSON

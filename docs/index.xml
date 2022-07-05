@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>RAT In Mi Kitchen</title>
+    <link>http://harelsegev.github.io/</link>
+    <description>Recent content on RAT In Mi Kitchen</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <lastBuildDate>Sat, 02 Jul 2022 00:00:00 +0000</lastBuildDate><atom:link href="http://harelsegev.github.io/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Home Adventures! A Prefetch File in $I30 Slack, PyInstaller &amp; Prefetch Hash Cracking</title>
+      <link>http://harelsegev.github.io/posts/home-adventures/home-adventures-a-prefetch-file-in-i30-slack-pyinstaller-prefetch-hash-cracking/</link>
+      <pubDate>Sat, 02 Jul 2022 00:00:00 +0000</pubDate>
+      
+      <guid>http://harelsegev.github.io/posts/home-adventures/home-adventures-a-prefetch-file-in-i30-slack-pyinstaller-prefetch-hash-cracking/</guid>
+      <description>I often test my tools on my old computer at home. It&amp;rsquo;s so much more interesting to investigate than a newly created virtual machine. Today, while testing, I found evidence of activity from almost 2 years ago. It got me really excited, and I thought it would make a cool blog post!
+Here&amp;rsquo;s a snippet from the timeline I created using MFTECmd and INDXRipper:
+A Prefetch File in $I30 Slack The Prefetch file FLOSS64.</description>
+      <content:encoded><![CDATA[<p>I often test my tools on my old computer at home. It&rsquo;s so much more interesting to investigate than a newly created virtual machine. Today, while testing, I found evidence of activity from almost 2 years ago. It got me really excited, and I thought it would make a cool blog post!</p>
+<p>Here&rsquo;s a snippet from the timeline I created using MFTECmd and INDXRipper:</p>
+<p><img loading="lazy" src="images/timeline.jpg" alt=""  />
+</p>
+<h2 id="a-prefetch-file-in-i30-slack">A Prefetch File in $I30 Slack</h2>
+<p>The Prefetch file <code>FLOSS64.EXE-F5F88991.pf</code> was created on September 10th 2020. Today is July 2nd 2022; almost 2 years have passed! There&rsquo;s no trace of this file in the MFT, nor in  $J - which goes only a week back. The only thing left proving this file once existed is a $I30 entry in slack space of the Prefetch folder.</p>
+<p>This Prefetch file must have been created because I executed Floss, which is a tool from FireEye. But <code>floss64.exe</code> is not in the MFT or in $J. It&rsquo;s not in my timeline, meaning INDXRipper could not find it in $I30 of any directory. I parsed the ShimCache and AmCache, but there was nothing there either.</p>
+<blockquote>
+<p>The $I30 of the Prefetch folder is a forensic goldmine; The $I30s from the users&rsquo; Recent folders are also very valuable. When triaging a system, I usually collect the $I30s from such key folders, these are just a few examples:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>C:\Windows\Prefetch
+</span></span><span style="display:flex;"><span>C:\Users\<span style="color:#f92672">*</span>\AppData\Roaming\Microsoft\Windows\Recent
+</span></span><span style="display:flex;"><span>C:\ProgramData\Microsoft\Windows Defender\LocalCopy
+</span></span><span style="display:flex;"><span>C:\Users\<span style="color:#f92672">*</span>\Downloads
+</span></span><span style="display:flex;"><span>C:\PerfLogs
+</span></span></code></pre></div><p>I use RawCopy to collect these; KAPE does not currently support $I30 collection.</p>
+</blockquote>
+<p>The prefetch file was created at 23:14:57, probably right after <code>floss64.exe</code> was first executed. We can also see a last modification time at 23:25:35. If I were to find this Prefetch file in the MFT, and this last modification timestamp were from <code>$STANDATD_INFORMATION</code>, I would say that it indicates the last execution time of <code>floss64.exe</code>. However, this timestamp is from $I30 slack, so this might not be the case.</p>
+<p>I know what you think - $I30 timestamps should mirror those in the <code>$STANDATD_INFORMATION</code> attribute! And you are absolutely right. But $I30 entries, as opposed to MFT entries, can move around throughout their lifetime. When a file is created or deleted in a directory, $I30 entries of other files in the directory may be unallocated, and then reallocated in a different place. This entry could have been unallocated while the Prefetch file was still active! In this case, the entry may contain outdated information.</p>
+<h2 id="pyinstaller">PyInstaller</h2>
+<p>Floss is written in Python, and is packaged with PyInstaller. Here&rsquo;s is a brief description of PyInstaller, straight from its manual:</p>
+<blockquote>
+<p>PyInstaller bundles a Python application and all its dependencies into a single package. The user can run the packaged app without installing a Python interpreter or any modules.</p>
+</blockquote>
+<p>There are also details about its inner workings:</p>
+<blockquote>
+<p>[&hellip;] The bootloader is the heart of the one-file bundle also. When started it creates a temporary folder in the appropriate temp-folder location for this OS. The folder is named <code>_MEI*xxxxxx*</code>, where <em>xxxxxx</em> is a random number. [&hellip;] The bootloader uncompresses the support files and writes copies into the temporary folder.</p>
+</blockquote>
+<p>At 23:28:52, The folder <code>_MEI86322</code> was created in my user&rsquo;s <code>Temp</code> directory, which indicates I executed a PyInstaller executable. INDXRipper was kind enough to parse the $I30 of this folder for us, so we can see a compiled python module (.pyd file) that was created inside the folder and deleted since.</p>
+<p>My guess is that <code>floss64.exe</code> was first executed at 23:14:57, then executed again in 23:25:35, and then again in 23:28:52. The $I30 entry we found in slack space was unallocated somewhere between 23:25:35 and 23:28:52, so the last modification time wasn&rsquo;t updated the next time <code>floss64.exe</code> was executed.</p>
+<p>An interesting thing to note, is that we only see a single <code>_MEI*xxxxxx*</code> folder; yet, we know a unique one should have been created for every execution of <code>floss64.exe</code>.</p>
+<blockquote>
+<p>When the bundled code terminates, the bootloader deletes the temporary folder. [&hellip;] The <code>_MEI*xxxxxx*</code> folder is not removed if the program crashes or is killed</p>
+</blockquote>
+<p>This is interesting! The folder <code>_MEI86322</code> is not deleted, so <code>floss64.exe</code> might have crashed after it was executed at 23:28:52. I looked for an error report, but couldn&rsquo;t find one.</p>
+<h2 id="prefetch-hash-cracking">Prefetch Hash Cracking</h2>
+<p>Can we find the folder from which <code>floss64.exe</code> was executed? Unfortunately, ShimCache and AmCache aren&rsquo;t much help this time. A cool thing we can try is to brute-force the Prefetch hash; i.e, hashing possible full paths of <code>floss64.exe</code> until the result matches the Prefetch hash, which is <code>F5F88991</code>. I wrote a little tool to do this for me; I just have to give it the bodyfile I used to create the timeline, so it can enumerate all the folders <code>floss64.exe</code> might have been executed from:</p>
+<p><img loading="lazy" src="images/hash_cracker.jpg" alt=""  />
+</p>
+<p>This doesn&rsquo;t always work, but this time it did! <code>floss64.exe</code> was executed from the Forensics directory on the C: drive.</p>
+<h2 id="wrapping-up">Wrapping Up</h2>
+<p>That&rsquo;s it for this post! I wanted to demonstrate both the value and the subtleties of $I30 analysis; let me know if you found that educational. Also, I&rsquo;m no expert; If you think I got something wrong, please tell me. Home Adventures may become a series if I find the time for it. I may also write a detailed post about INDXRipper; Let me know if you&rsquo;d be interested in that!</p>
+<h3 id="tool-list">Tool List</h3>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MFTECmd</td>
+<td><a href="https://github.com/EricZimmerman/MFTECmd">https://github.com/EricZimmerman/MFTECmd</a></td>
+</tr>
+<tr>
+<td>INDXRipper</td>
+<td><a href="https://github.com/harelsegev/INDXRipper">https://github.com/harelsegev/INDXRipper</a></td>
+</tr>
+<tr>
+<td>Prefetch Hash Cracker</td>
+<td><a href="https://github.com/harelsegev/prefetch-hash-cracker">https://github.com/harelsegev/prefetch-hash-cracker</a></td>
+</tr>
+</tbody>
+</table>
+]]></content:encoded>
+    </item>
+    
+    
+    
+  </channel>
+</rss>
