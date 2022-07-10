@@ -9,14 +9,14 @@ params:
   keywords: ["Blog", "DFIR"]
   DateFormat: "January 2, 2006"
   author: "Harel Segev"
-  defaultTheme: auto
+  defaultTheme: dark
   disableThemeToggle: false
 
   ShowReadingTime: true
   ShowShareButtons: true
   ShowPostNavLinks: true
   ShowBreadCrumbs: true
-  ShowCodeCopyButtons: false
+  ShowCodeCopyButtons: true
   ShowWordCount: true
   ShowRssButtonInSectionTermList: true
   ShowFullTextinRSS: true
@@ -26,7 +26,7 @@ params:
   comments: true
   hidemeta: false
   hideSummary: false
-  showtoc: false
+  showtoc: true
   tocopen: false
   
   # home-info mode

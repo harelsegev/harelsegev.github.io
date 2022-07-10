@@ -2,7 +2,7 @@
 title: "Home Adventures! A Prefetch File in $I30 Slack, PyInstaller & Prefetch Hash Cracking"
 date: "2022-07-02"
 author: "Harel Segev"
-tags: ["Prefetch", "$I30", "PyInstaller"]
+tags: ["Prefetch", "$I30", "NTFS", "PyInstaller"]
 draft: false
 ---
 
