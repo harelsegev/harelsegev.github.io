@@ -435,7 +435,7 @@ In the previous version, we built paths using the long file name (LFN) of each f
 
 In this new version, we prioritize LFN `$FILE_NAME` attributes, but we will use the SFN `$FILE_NAME` attribute if it's the only one left.
 
-## Epilogue
+## Closing Thoughts
 
 This post was my attempt to create the resource I wish I had when I wrote my MFT parser. MFT parsing is such a fundamental technique in forensics; yet, the resources to learn it are lacking. People have been writing MFT parsers for years, each one on their own, rediscovering the same edge cases and learning the same lessons again and again.
 

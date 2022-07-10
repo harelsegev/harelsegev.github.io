@@ -467,7 +467,7 @@ An index to the MFT record of the file&rsquo;s parent folder.</p>
 </span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">return</span> <span style="color:#ae81ff">1</span>
 </span></span></code></pre></div><p>In the previous version, we built paths using the long file name (LFN) of each folder, because the long names are more meaningful than the auto-generated short names. Now we know that the <code>$FILE_NAME</code> attribute containing the short name may be the only <code>$FILE_NAME</code> attribute left after some of a folder&rsquo;s records were reused.</p>
 <p>In this new version, we prioritize LFN <code>$FILE_NAME</code> attributes, but we will use the SFN <code>$FILE_NAME</code> attribute if it&rsquo;s the only one left.</p>
-<h2 id="epilogue">Epilogue</h2>
+<h2 id="closing-thoughts">Closing Thoughts</h2>
 <p>This post was my attempt to create the resource I wish I had when I wrote my MFT parser. MFT parsing is such a fundamental technique in forensics; yet, the resources to learn it are lacking. People have been writing MFT parsers for years, each one on their own, rediscovering the same edge cases and learning the same lessons again and again.</p>
 <p>It really shouldn&rsquo;t be like that. I think we DFIR programmers have a lot to learn in sharing our knowledge with one another, so we can push the field forward, together.</p>
 ]]></content:encoded>
