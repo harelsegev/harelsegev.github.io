@@ -432,8 +432,8 @@ An index to the MFT record of the file&rsquo;s parent folder.</p>
 </span></span><span style="display:flex;"><span>        
 </span></span><span style="display:flex;"><span>        <span style="color:#75715e"># get the filename attributes from any extension records of my parent</span>
 </span></span><span style="display:flex;"><span>        parent_filename_attributes <span style="color:#f92672">+=</span> get_extension_filename_attributes(
-</span></span><span style="display:flex;"><span>        	parent_record<span style="color:#f92672">.</span>get_mft_index(),
-</span></span><span style="display:flex;"><span>            parent_sequence
+</span></span><span style="display:flex;"><span>        	filename_attribute<span style="color:#f92672">.</span>get_field(<span style="color:#e6db74">&#34;Parent index&#34;</span>),
+</span></span><span style="display:flex;"><span>            filename_attribute<span style="color:#f92672">.</span>get_field(<span style="color:#e6db74">&#34;Parent sequence&#34;</span>)
 </span></span><span style="display:flex;"><span>        )
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> <span style="color:#f92672">not</span> parent_filename_attributes:

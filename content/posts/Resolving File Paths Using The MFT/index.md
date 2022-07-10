@@ -396,8 +396,8 @@ def build_path_helper(mft, filename_attribute):
         
         # get the filename attributes from any extension records of my parent
         parent_filename_attributes += get_extension_filename_attributes(
-        	parent_record.get_mft_index(),
-            parent_sequence
+        	filename_attribute.get_field("Parent index"),
+            filename_attribute.get_field("Parent sequence")
         )
 
         if not parent_filename_attributes:
