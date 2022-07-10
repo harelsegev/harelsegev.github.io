@@ -1,0 +1,477 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>MFT on RAT In Mi Kitchen</title>
+    <link>http://harelsegev.github.io/tags/mft/</link>
+    <description>Recent content in MFT on RAT In Mi Kitchen</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <lastBuildDate>Thu, 07 Jul 2022 00:00:00 +0000</lastBuildDate><atom:link href="http://harelsegev.github.io/tags/mft/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Resolving File Paths Using The MFT</title>
+      <link>http://harelsegev.github.io/posts/resolving-file-paths-using-the-mft/</link>
+      <pubDate>Thu, 07 Jul 2022 00:00:00 +0000</pubDate>
+      
+      <guid>http://harelsegev.github.io/posts/resolving-file-paths-using-the-mft/</guid>
+      <description>In NTFS, the MFT (Master File Table) is a structure that contains a lot of the file-system metadata, and also the contents of small files. It is stored in a special file, called $MFT. In incident response, we often collect and parse this file to determine the file system contents and how it changed over time, without having to acquire a full disk image.
+There are many bad MFT parsers out there.</description>
+      <content:encoded><![CDATA[<p>In NTFS, the MFT (Master File Table) is a structure that contains a lot of the file-system metadata, and also the contents of small files. It is stored in a special file, called <code>$MFT</code>. In incident response, we often collect and parse this file to determine the file system contents and how it changed over time, without having to acquire a full disk image.</p>
+<p>There are many bad MFT parsers out there. This is no coincidence - an MFT parser is an extremely easy thing to mess up. Most MFT parsers don&rsquo;t bother handling the uncommon edge cases - and they work fine, most of the times. The fact is, some of those uncommon edge cases are actually more common than you would think. Handling them correctly is what sets the good MFT parsers apart from the bad ones.</p>
+<p>The MFT is an array of  file records - each one describes a file on the system. File records do not to store directory hierarchy, though. There&rsquo;s another structure for that - directory indexes. The directory index a file is listed in determines its location in the directory tree. The directory index is the one storing the name of the file, inside a structure called a <code>$FILE_NAME</code> attribute.</p>
+<p>Reconstructing full file paths using only the MFT is not trivial. Whether it is a reliable method at all is debatable. It is only possible because of an NTFS quirk - There&rsquo;s a backup of every file&rsquo;s <code>$FILE_NAME</code> attribute inside its MFT record. Nonetheless, this method is simple, fast, and is often good enough. In this post, I&rsquo;ll help you avoid its common implementation pitfalls.</p>
+<h2 id="before-we-start">Before we Start</h2>
+<p>Given a <code>$MFT</code> file, we first have to determine the size of an individual file record. It&rsquo;s usually 1024 bytes, but it doesn&rsquo;t have to be. This value is stored in the file system boot sector - which we don&rsquo;t have. Instead, we can find any two consecutive file records, and calculate the difference between their offsets. This should give us the size of a file record.</p>
+<p>Another thing to consider, is that file records, like other important file system structures, use <a href="https://flatcap.github.io/linux-ntfs/ntfs/concepts/fixup.html">fixup values</a> to detect disk errors. If you ignore fixup values, your parser will output incorrect data, and the worst part is - you are probably not going to notice. Take my word for it, and start writing the code to deal with fixup values early on.</p>
+<h2 id="a-naive--approach">A Naive  Approach</h2>
+<p>This is the structure of a <code>$FILE_NAME</code> attribute:</p>
+<table>
+<thead>
+<tr>
+<th>Offset</th>
+<th>Size</th>
+<th style="text-align:left">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0x00</td>
+<td>6</td>
+<td style="text-align:left">Parent index</td>
+</tr>
+<tr>
+<td>0x06</td>
+<td>2</td>
+<td style="text-align:left">Parent sequence</td>
+</tr>
+<tr>
+<td>0x08</td>
+<td>8</td>
+<td style="text-align:left">Creation time</td>
+</tr>
+<tr>
+<td>0x10</td>
+<td>8</td>
+<td style="text-align:left">Modification time</td>
+</tr>
+<tr>
+<td>0x18</td>
+<td>8</td>
+<td style="text-align:left">MFT record change time</td>
+</tr>
+<tr>
+<td>0x20</td>
+<td>8</td>
+<td style="text-align:left">Access time</td>
+</tr>
+<tr>
+<td>0x28</td>
+<td>8</td>
+<td style="text-align:left">Allocated size</td>
+</tr>
+<tr>
+<td>0x30</td>
+<td>8</td>
+<td style="text-align:left">Real size</td>
+</tr>
+<tr>
+<td>0x38</td>
+<td>4</td>
+<td style="text-align:left">Flags</td>
+</tr>
+<tr>
+<td>0x3C</td>
+<td>4</td>
+<td style="text-align:left">Used by EAs and Reparse</td>
+</tr>
+<tr>
+<td>0x40</td>
+<td>1</td>
+<td style="text-align:left">Filename length in bytes / 2 (L)</td>
+</tr>
+<tr>
+<td>0x41</td>
+<td>1</td>
+<td style="text-align:left">Filename namespace</td>
+</tr>
+<tr>
+<td>0x42</td>
+<td>2L</td>
+<td style="text-align:left">Filename in Unicode (not null terminated)</td>
+</tr>
+</tbody>
+</table>
+<p>As mentioned earlier, each file has a <code>$FILE_NAME</code> attribute inside its MFT record. For now, we&rsquo;re only interested in these 2 fields:</p>
+<ul>
+<li>
+<p><code>Filename</code><br>
+The name of the file described by the record.</p>
+</li>
+<li>
+<p><code>Parent index</code><br>
+An index to the MFT record of the file&rsquo;s parent folder.</p>
+</li>
+</ul>
+<p>Using these fields, we can build the full path of a file:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-markdown" data-lang="markdown"><span style="display:flex;"><span>                +--------------+
+</span></span><span style="display:flex;"><span>    +----------&gt;| .            |    4. .\Documents\PDF\document.pdf
+</span></span><span style="display:flex;"><span>    |           +--------------+        
+</span></span><span style="display:flex;"><span>    |  +-------&gt;| Documents    |    3. Documents\PDF\document.pdf
+</span></span><span style="display:flex;"><span>    +--|--------+--------------+
+</span></span><span style="display:flex;"><span>       |        |              |
+</span></span><span style="display:flex;"><span>       |        +--------------+
+</span></span><span style="display:flex;"><span>       |  +----&gt;| PDF          |    2. PDF\document.pdf
+</span></span><span style="display:flex;"><span>       +--|-----+--------------+
+</span></span><span style="display:flex;"><span>          |     |              |
+</span></span><span style="display:flex;"><span>          |     +--------------+
+</span></span><span style="display:flex;"><span>          |     |              |
+</span></span><span style="display:flex;"><span>          |     +--------------+
+</span></span><span style="display:flex;"><span>          |     | document.pdf |    1. document.pdf
+</span></span><span style="display:flex;"><span>          +-----+--------------+
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>In NTFS, &#34;.&#34; is the file name of the root directory.
+</span></span></code></pre></div><p>By looping over the MFT records, we can do this for every file on the system. Here&rsquo;s a Python-style pseudo code of the algorithm:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python3" data-lang="python3"><span style="display:flex;"><span><span style="color:#66d9ef">for</span> current_record <span style="color:#f92672">in</span> mft<span style="color:#f92672">.</span>get_records():
+</span></span><span style="display:flex;"><span>    print(build_path(mft, current_record))
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">build_path</span>(mft, current_record):
+</span></span><span style="display:flex;"><span>    path <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;&#34;</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">while</span> <span style="color:#f92672">not</span> is_root_directory(current_record):
+</span></span><span style="display:flex;"><span>        filename_attribute <span style="color:#f92672">=</span> current_record<span style="color:#f92672">.</span>get_attribute(<span style="color:#e6db74">&#34;$FILE_NAME&#34;</span>)
+</span></span><span style="display:flex;"><span>        path <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;</span><span style="color:#ae81ff">\\</span><span style="color:#e6db74">&#34;</span> <span style="color:#f92672">+</span> filename_attribute<span style="color:#f92672">.</span>get_field(<span style="color:#e6db74">&#34;Filename&#34;</span>) <span style="color:#f92672">+</span> path
+</span></span><span style="display:flex;"><span>        current_record <span style="color:#f92672">=</span> mft<span style="color:#f92672">.</span>get_record_at(filename_attribute<span style="color:#f92672">.</span>get_field(<span style="color:#e6db74">&#34;Parent index&#34;</span>))
+</span></span><span style="display:flex;"><span>        
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">return</span> <span style="color:#e6db74">&#34;.&#34;</span> <span style="color:#f92672">+</span> path
+</span></span></code></pre></div><p>Of course, we could have used caching to improve the efficiency - but for the sake of simplicity, all of the code in this post will be pretty inefficient. In the next sections, we&rsquo;ll see how deleted files, hard links and extension records break everything, and we&rsquo;ll change our code to deal with them.</p>
+<h2 id="pitfall-1-orphan-files--the-sequence-number">Pitfall 1: Orphan Files &amp; The Sequence Number</h2>
+<p>The first edge case we&rsquo;ll discuss involves deleted files. When a file is deleted, its MFT record is marked as free. Then, it can be reused if a new file is created - why add a new record to the MFT when there&rsquo;s a free, existing one? If there are multiple free records, and a new file is created - it may occupy either one of them.</p>
+<h3 id="orphan-files">Orphan Files</h3>
+<p>As long as the record of a deleted file is not reused - it remains intact, which means we can resolve the file&rsquo;s path just like any other file. Problems may arise if the file&rsquo;s parent folder is deleted as well. Let&rsquo;s see what happens when the parent folder&rsquo;s record is reused, while the child&rsquo;s record remains free:</p>
+<ol>
+<li>
+<p>Folder1 is created. It occupies the MFT record at index 41</p>
+<table>
+<thead>
+<tr>
+<th>Record state</th>
+<th>Record index</th>
+<th>Reconstructed file path</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>In use</code></td>
+<td>41</td>
+<td>.\Folder1</td>
+</tr>
+</tbody>
+</table>
+</li>
+<li>
+<p>File1.txt is created inside Folder1. It occupies the MFT record at index 42</p>
+<table>
+<thead>
+<tr>
+<th>Record state</th>
+<th>Record index</th>
+<th>Reconstructed file path</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>In use</code></td>
+<td>41</td>
+<td>.\Folder1</td>
+</tr>
+<tr>
+<td><code>In use</code></td>
+<td>42</td>
+<td>.\Folder1\File1.txt</td>
+</tr>
+</tbody>
+</table>
+</li>
+<li>
+<p>Folder1 is deleted. File1.txt is in Folder1, so it is also deleted</p>
+<table>
+<thead>
+<tr>
+<th>Record state</th>
+<th>Record index</th>
+<th>Reconstructed file path</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Free</code></td>
+<td>41</td>
+<td>.\Folder1</td>
+</tr>
+<tr>
+<td><code>Free</code></td>
+<td>42</td>
+<td>.\Folder1\File1.txt</td>
+</tr>
+</tbody>
+</table>
+</li>
+<li>
+<p>Folder2 is created. It occupies the MFT record at index 41</p>
+<table>
+<thead>
+<tr>
+<th>Record state</th>
+<th>Record index</th>
+<th>Reconstructed file path</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>In use</code></td>
+<td>41</td>
+<td>.\Folder2.txt</td>
+</tr>
+<tr>
+<td><code>Free</code></td>
+<td>42</td>
+<td>.\Folder2\File1.txt</td>
+</tr>
+</tbody>
+</table>
+</li>
+</ol>
+<p>File1.txt was never in Folder2!</p>
+<p>Deleted files their parent folder&rsquo;s record was reused are called <em>Orphan Files</em>. They were once created in some folder, but it is now gone. their original path cannot be resolved. A folder can be orphan too, which will make it the root of an orphan sub-tree. The hierarchy of the files inside an orphan sub-tree can be reconstructed, but it&rsquo;s detached from the main directory tree. the original path of the root of the sub-tree, which is an orphan folder, cannot be resolved.</p>
+<h3 id="the-sequence-number">The Sequence Number</h3>
+<p>On its own, an MFT index is not enough to reference a file. It references a record, which can be reused to describe many files over time. We don&rsquo;t want to reference records, we want to reference the files they describe. To reference a file, not only do we need to know its MFT index, but also whether the record in that index still belongs to it, or has been reused since.</p>
+<p>This is where the sequence number comes in. It is stored in the record header, and is used together with the MFT index to reference files. That&rsquo;s why together, they are called a <em>File Reference</em>. Every time a record is <strong>freed</strong>, its sequence number is increased by 1. Then, any file references with the old sequence number are considered invalid.</p>
+<p>Here&rsquo;s a pseudo-code of a reference validation function:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python3" data-lang="python3"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">is_valid_file_reference</span>(mft, mft_index, sequence_number):
+</span></span><span style="display:flex;"><span>	file_record <span style="color:#f92672">=</span> mft<span style="color:#f92672">.</span>get_record_at(mft_index)
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">if</span> file_record<span style="color:#f92672">.</span>is_used():
+</span></span><span style="display:flex;"><span>	    <span style="color:#66d9ef">return</span> file_record<span style="color:#f92672">.</span>get_sequence_number() <span style="color:#f92672">==</span> sequence_number
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">else</span>:
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># the sequence number was increased when the record was freed, </span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># so we should decrease it to get the actual sequence number of the file</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">return</span> file_record<span style="color:#f92672">.</span>get_sequence_number() <span style="color:#f92672">-</span> <span style="color:#ae81ff">1</span> <span style="color:#f92672">==</span> sequence_number
+</span></span></code></pre></div><p>Look again at the structure of the <code>$FILE_NAME</code> attribute. Not only do we have the MFT index of the parent folder, but also its sequence number. In other words - we have a file reference to the parent folder. This is exactly what we need to identify orphan files - all we need to do is validate this reference. If it&rsquo;s not valid, it means the parent folder was deleted, and its record was reused.</p>
+<p>Now that we can identify orphan files, we have to decide how our code should deal with them. We could output the filenames and paths separately, and just not output a path for them. Or maybe we can place them all in some special folder, but which one? There&rsquo;s no folder it would be right to place them in. The solution we&rsquo;ll go with is quite simple: we&rsquo;ll just create a new folder for them.</p>
+<p>Of course, it won&rsquo;t be an actual file system folder - we cannot create these. Nevertheless, we are the ones building the directory tree, so we can just &ldquo;make up&rdquo; a folder. It would be a &ldquo;virtual folder&rdquo;, if you will. We&rsquo;ll call it &ldquo;$OrphanFiles&rdquo; and place it in the root directory. Now we have a foster parent for all the orphan files!</p>
+<p>Here&rsquo;s our upgraded code:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python3" data-lang="python3"><span style="display:flex;"><span><span style="color:#66d9ef">for</span> current_record <span style="color:#f92672">in</span> mft<span style="color:#f92672">.</span>get_records():
+</span></span><span style="display:flex;"><span>    print(build_path(mft, current_record))
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">build_path</span>(mft, current_record):
+</span></span><span style="display:flex;"><span>    path <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;&#34;</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">while</span> <span style="color:#f92672">not</span> is_root_directory(current_record):
+</span></span><span style="display:flex;"><span>        filename_attribute <span style="color:#f92672">=</span> current_record<span style="color:#f92672">.</span>get_attribute(<span style="color:#e6db74">&#34;$FILE_NAME&#34;</span>)
+</span></span><span style="display:flex;"><span>        path <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;</span><span style="color:#ae81ff">\\</span><span style="color:#e6db74">&#34;</span> <span style="color:#f92672">+</span> filename_attribute<span style="color:#f92672">.</span>get_field(<span style="color:#e6db74">&#34;Filename&#34;</span>) <span style="color:#f92672">+</span> path
+</span></span><span style="display:flex;"><span>        current_record <span style="color:#f92672">=</span> mft<span style="color:#f92672">.</span>get_record_at(filename_attribute<span style="color:#f92672">.</span>get_field(<span style="color:#e6db74">&#34;Parent index&#34;</span>))
+</span></span><span style="display:flex;"><span>		
+</span></span><span style="display:flex;"><span>        sequence_number <span style="color:#f92672">=</span> current_record<span style="color:#f92672">.</span>get_sequence_number()
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> <span style="color:#f92672">not</span> current_record<span style="color:#f92672">.</span>is_used():
+</span></span><span style="display:flex;"><span>            sequence number <span style="color:#f92672">-=</span> <span style="color:#ae81ff">1</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> sequence_number <span style="color:#f92672">!=</span> filename_attribute<span style="color:#f92672">.</span>get_field(<span style="color:#e6db74">&#34;Parent sequence&#34;</span>):
+</span></span><span style="display:flex;"><span>            path <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;</span><span style="color:#ae81ff">\\</span><span style="color:#e6db74">$OrphanFiles&#34;</span> <span style="color:#f92672">+</span> path 
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">break</span>
+</span></span><span style="display:flex;"><span>        
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> <span style="color:#e6db74">&#34;.&#34;</span> <span style="color:#f92672">+</span> path
+</span></span></code></pre></div><h2 id="pitfall-2-hard-links-and-short-names">Pitfall 2: Hard Links and Short Names</h2>
+<h3 id="hard-links">Hard Links</h3>
+<p>Hard links are an often overlooked feature of NTFS. They are similar in functionality to the hard links in other file systems - a file can be located in multiple folders at the same time, and can have a different name in each one. Each directory index a file is located in stores a <code>$FILE_NAME</code> attribute for it. Fortunately for us, we have copies of all of these <code>$FILE_NAME</code> attributes in the file&rsquo;s MFT record.</p>
+<p>This means a file can have multiple paths. To be exact, a file can have multiple hard links, and each one of <em>them</em> has a path. Each hard link has its own <code>$FILE_NAME</code>  attribute, containing its own file name and parent folder. To build all of the paths for a file, we&rsquo;ll loop over every <code>$FILE_NAME</code> attribute in its MFT record, and use them to build the path of each hard link separately.</p>
+<p>Folders are easier to handle, because NTFS does not allow multiple hard links for them - it would allow you to create loops in the directory tree, and nobody wants that. This means a folder has only a single path. A hard link has a single parent folder - so it also has a single path. This means we&rsquo;ll build the path of each hard link very similarly to how we did it previously.</p>
+<h3 id="short-names">Short Names</h3>
+<p>Short file names (SFNs) are a special type of hard links. If enabled, they&rsquo;re created automatically for files their names are too long to be handled by some old applications. They provide these old applications with an auto-generated, shorter file name they can handle. A short name is created in the same directory with the original hard link, and we can build the path for it the same way we do for a regular hard link.</p>
+<p>We can tell whether a <code>$FILE_NAME</code> attribute contains a short name by checking its <em>Filename namespace</em> flag. A <code>DOS</code> namespace means it&rsquo;s a short name, and a <code>WIN32</code> or a <code>POSIX</code> namespace means it&rsquo;s a regular, long name. <code>WIN32 &amp; DOS</code> is a special value indicating there is no short name for the file, because its name is already a valid short name.</p>
+<p>Folders cannot have regular hard links, but they can have short names. This is a problem - if folders can have 2 different names, it means a hard link can have a huge number of different paths. Suppose a hard link is <code>n</code> folders deep in the directory tree, and each folder has 2 names at most - long and short, excluding the root directory, a hard link has at most <code>2ⁿ⁻¹</code> different paths!</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-markdown" data-lang="markdown"><span style="display:flex;"><span>. \ ??? \ ??? \ ??? \ .... \ File.txt
+</span></span><span style="display:flex;"><span>     x2    x2    x2    ....
+</span></span></code></pre></div><p>To keep things reasonable, we&rsquo;ll only use the long name of each folder to build the path of a hard link. By doing so, we&rsquo;re in fact choosing a single path for it, out of the many it may have. We can get away with it, because we build the paths for the folders in the exact same way. Each folder&rsquo;s short name is also a hard link, and we&rsquo;ll build a path for it when we get to that folder&rsquo;s MFT record. We&rsquo;re not loosing any short names.</p>
+<p>Long names with the same prefix will have similar short names generated for them. It&rsquo;s important to output the MFT index of each path, so we can tell which short name belongs to which long name:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-markdown" data-lang="markdown"><span style="display:flex;"><span>MFT Index    Path
+</span></span><span style="display:flex;"><span>59:			.\Program Files
+</span></span><span style="display:flex;"><span>1293:		.\ProgramData
+</span></span><span style="display:flex;"><span>59:			.\PROGRA~1
+</span></span><span style="display:flex;"><span>1293:		.\PROGRA~2
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>PROGRA~1 --&gt; Program Files
+</span></span><span style="display:flex;"><span>PROGRA~2 --&gt; ProgramData
+</span></span></code></pre></div><p>This is the upgraded code. It now handles hard links, and outputs both long and short names:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python3" data-lang="python3"><span style="display:flex;"><span><span style="color:#66d9ef">for</span> current_record <span style="color:#f92672">in</span> mft<span style="color:#f92672">.</span>get_records():
+</span></span><span style="display:flex;"><span>    build_path(mft, current_record)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">build_path</span>(mft, current_record):
+</span></span><span style="display:flex;"><span>	mft_index <span style="color:#f92672">=</span> current_record<span style="color:#f92672">.</span>get_mft_index()
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">for</span> filename_attribute <span style="color:#f92672">in</span> current_record<span style="color:#f92672">.</span>get_filename_attributes():
+</span></span><span style="display:flex;"><span>        print(mft_index <span style="color:#f92672">+</span> <span style="color:#e6db74">&#34;: &#34;</span> <span style="color:#f92672">+</span> build_path_helper(mft, filename_attribute))
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">build_path_helper</span>(mft, filename_attribute):
+</span></span><span style="display:flex;"><span>    path <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;&#34;</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">while</span> <span style="color:#66d9ef">True</span>
+</span></span><span style="display:flex;"><span>        path <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;</span><span style="color:#ae81ff">\\</span><span style="color:#e6db74">&#34;</span> <span style="color:#f92672">+</span> filename_attribute<span style="color:#f92672">.</span>get_field(<span style="color:#e6db74">&#34;Filename&#34;</span>) <span style="color:#f92672">+</span> path
+</span></span><span style="display:flex;"><span>        parent_record <span style="color:#f92672">=</span> mft<span style="color:#f92672">.</span>get_record_at(filename_attribute<span style="color:#f92672">.</span>get_field(<span style="color:#e6db74">&#34;Parent index&#34;</span>))
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> is_root_directory(parent_record):
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">break</span>
+</span></span><span style="display:flex;"><span>        
+</span></span><span style="display:flex;"><span>        parent_sequence <span style="color:#f92672">=</span> parent_record<span style="color:#f92672">.</span>get_sequence_number()
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> <span style="color:#f92672">not</span> parent_record<span style="color:#f92672">.</span>is_used():
+</span></span><span style="display:flex;"><span>            parent_sequence <span style="color:#f92672">-=</span> <span style="color:#ae81ff">1</span>
+</span></span><span style="display:flex;"><span>        
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> parent_sequence <span style="color:#f92672">!=</span> filename_attribute<span style="color:#f92672">.</span>get_field(<span style="color:#e6db74">&#34;Parent sequence&#34;</span>):
+</span></span><span style="display:flex;"><span>            path <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;</span><span style="color:#ae81ff">\\</span><span style="color:#e6db74">$OrphanFiles&#34;</span> <span style="color:#f92672">+</span> path 
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">break</span>
+</span></span><span style="display:flex;"><span>            
+</span></span><span style="display:flex;"><span>        filename_attribute <span style="color:#f92672">=</span> next(get_lfn_filename_attributes(parent_record))
+</span></span><span style="display:flex;"><span>        
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> <span style="color:#e6db74">&#34;.&#34;</span> <span style="color:#f92672">+</span> path
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># Get only filename attributes with a Long File Name (LFN)</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">get_lfn_filename_attributes</span>(file_record):
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">for</span> filename_attribute <span style="color:#f92672">in</span> file_record<span style="color:#f92672">.</span>get_filename_attributes():
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> filename_attribute<span style="color:#f92672">.</span>get_field(<span style="color:#e6db74">&#34;Name space&#34;</span>) <span style="color:#f92672">!=</span> <span style="color:#e6db74">&#34;DOS&#34;</span>:
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">yield</span> filename_attribute
+</span></span></code></pre></div><p>If you don&rsquo;t care about the short names, you don&rsquo;t have to build paths for them. You can simply ignore them altogether. That&rsquo;s perfectly fine, but I believe it&rsquo;s better to output both long and short names - and group them into a single event, later in the analysis phase. To ignore short names, all we need is a small modification to the <code>build_path</code> function:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python3" data-lang="python3"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">build_path</span>(mft, current_record):
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">for</span> filename_attribute <span style="color:#f92672">in</span> get_lfn_filename_attributes(current_record):
+</span></span><span style="display:flex;"><span>        print build_path_helper(mft, filename_attribute)
+</span></span></code></pre></div><h2 id="pitfall-3-extension-records-missing-attributes-and-orphaned-attributes">Pitfall 3: Extension Records, Missing Attributes and Orphaned Attributes</h2>
+<h3 id="extension-records">Extension Records</h3>
+<p>If a file becomes extremely large and fragmented, or has many hard links and data streams, a single file record may not be big enough to contain all of its attributes. In such case, the file will occupy additional file records. The main record is called the <em>Base Record</em>, and the additional ones are called <em>Extension Records</em>. The base record will contain a special attribute, called <code>$ATTRIBUTE_LIST</code>, which stores the information needed to find the rest of the file&rsquo;s attributes.</p>
+<p>Some MFT parsers use the <code>$ATTRIBUTE_LIST</code> attribute in the base record to find its extension records. However, this is a major mistake, because <code>$ATTRIBUTE_LIST</code> attributes can be non-resident (stored outside the MFT). Instead, we&rsquo;ll take the opposite approach - find the extension records, and trace them back to their base record.</p>
+<p>Conveniently, the file record header contains a <code>Base index</code> and <code>Base sequence</code> fields, to store a file reference to the base record. In base records, these fields are zeroed out. This means we can also use them to differentiate base records from extension records, without having to check for a <code>$ATTRIBUTE_LIST</code> attribute.</p>
+<p>By looping over the MFT, we can create a mapping of base records to extension records:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python3" data-lang="python3"><span style="display:flex;"><span><span style="color:#75715e"># a dictionay to map base records to their extension records</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># mappings are of the form: (n, m) -&gt; [k1, k2, ...], where:</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># (n, m) is a file reference of a base record</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># ki is the MFT index of an extension record</span>
+</span></span><span style="display:flex;"><span>extension_records <span style="color:#f92672">=</span> {}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">for</span> current_record <span style="color:#f92672">in</span> mft<span style="color:#f92672">.</span>get_records():
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span> <span style="color:#f92672">not</span> is_base_record(current_record):
+</span></span><span style="display:flex;"><span>        base_index <span style="color:#f92672">=</span> current_record<span style="color:#f92672">.</span>get_base_record_index()
+</span></span><span style="display:flex;"><span>        base_sequence <span style="color:#f92672">=</span> current_record<span style="color:#f92672">.</span>get_base_record_sequence()
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        (extension_records
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">.</span>setdefault((base_index, base_sequence), [])
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">.</span>append(current_record<span style="color:#f92672">.</span>get_mft_index()))
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">is_base_record</span>(current_record):
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> (current_record<span style="color:#f92672">.</span>get_base_record_index() <span style="color:#f92672">==</span> <span style="color:#ae81ff">0</span> <span style="color:#f92672">and</span>
+</span></span><span style="display:flex;"><span>            current_record<span style="color:#f92672">.</span>get_base_record_sequeunce() <span style="color:#f92672">==</span> <span style="color:#ae81ff">0</span>)
+</span></span></code></pre></div><p>After we created this dictionary, we have to loop over the MFT one more time. This time, looking for base records. For each base record, we should build a path for all the <code>$FILE_NAME</code> attributes both in it, and in its extension records - if it has any.</p>
+<h3 id="missing-attributes">Missing Attributes</h3>
+<p>As always, deleted files create problems. When a file is deleted, its base record and all of its extension records are marked as free. The problem is - all of those free records are not going to be reused all at the same time. If some, but not all of the records are reused, we loose some, but not all of the file&rsquo;s attributes. This has major consequences on MFT parsing in general, and on path reconstruction in particular.</p>
+<p>We may find a file without any <code>$FILE_NAME</code> attributes. For such a file, path reconstruction is impossible. The best you can do is give it a unique identifier. You may then be tempted to place it in the $OrphanFiles folder, but that wouldn&rsquo;t be right -  it&rsquo;s not necessarily orphan. Sure, it&rsquo;s deleted, but its parent folder might not be.</p>
+<p>If you find a <strong>folder</strong> without any <code>$FILE_NAME</code> attributes, you may also find deleted files that were once inside it. Those files can be safely placed in the $OrphanFiles folder, because their parent is definitely deleted, and we didn&rsquo;t output a path for it.</p>
+<h3 id="orphaned-attributes">Orphaned Attributes</h3>
+<p>If we find a <code>$FILE_NAME</code> attribute with an invalid parent reference, it means the file is orphan, right? Well, yes -but we can do better than this. Before declaring the file as orphan, we should check whether its parent has any extension records left, and whether there&rsquo;s a <code>$FILE_NAME</code> attribute in one of them; if there is, we can resolve the file&rsquo;s path, even though the parent folder&rsquo;s base record was reused!</p>
+<p>This is the final version of our code. It handles everything we talked about so far: orphan files, hard links and extension records:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python3" data-lang="python3"><span style="display:flex;"><span><span style="color:#75715e"># a dictionay to map base records to their extension records</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># mappings are of the form: (n, m) -&gt; [k1, k2, ...], where:</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># (n, m) is a file reference of a base record</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># ki is the MFT index of an extension record</span>
+</span></span><span style="display:flex;"><span>extension_records <span style="color:#f92672">=</span> {}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># first pass over the MFT</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">for</span> current_record <span style="color:#f92672">in</span> mft<span style="color:#f92672">.</span>get_records():
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span> <span style="color:#f92672">not</span> is_base_record(current_record):
+</span></span><span style="display:flex;"><span>        base_index <span style="color:#f92672">=</span> current_record<span style="color:#f92672">.</span>get_base_record_index()
+</span></span><span style="display:flex;"><span>        base_sequence <span style="color:#f92672">=</span> current_record<span style="color:#f92672">.</span>get_base_record_sequence()
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        (extension_records
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">.</span>setdefault((base_index, base_sequence), [])
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">.</span>append(current_record<span style="color:#f92672">.</span>get_mft_index()))
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># second pass over the MFT</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">for</span> current_record <span style="color:#f92672">in</span> mft<span style="color:#f92672">.</span>get_records():
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span> is_base_record(current_record):
+</span></span><span style="display:flex;"><span>        build_path(mft, current_record)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">is_base_record</span>(current_record):
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> (current_record<span style="color:#f92672">.</span>get_base_record_index() <span style="color:#f92672">==</span> <span style="color:#ae81ff">0</span> <span style="color:#f92672">and</span>
+</span></span><span style="display:flex;"><span>            current_record<span style="color:#f92672">.</span>get_base_record_sequeunce() <span style="color:#f92672">==</span> <span style="color:#ae81ff">0</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">build_path</span>(mft, current_record):    
+</span></span><span style="display:flex;"><span>    base_filename_attributes <span style="color:#f92672">=</span> current_record<span style="color:#f92672">.</span>get_filename_attributes()
+</span></span><span style="display:flex;"><span>    extension_filename_attributes <span style="color:#f92672">=</span> get_extension_filename_attributes(
+</span></span><span style="display:flex;"><span>        current_record<span style="color:#f92672">.</span>get_mft_index(),
+</span></span><span style="display:flex;"><span>        current_record<span style="color:#f92672">.</span>get_sequence_number()
+</span></span><span style="display:flex;"><span>    )
+</span></span><span style="display:flex;"><span>    
+</span></span><span style="display:flex;"><span>    mft_index <span style="color:#f92672">=</span> current_record<span style="color:#f92672">.</span>get_mft_index()
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">for</span> filename_attribute <span style="color:#f92672">in</span> base_filename_attributes <span style="color:#f92672">+</span> extension_filename_attributes:
+</span></span><span style="display:flex;"><span>    	print(mft_index <span style="color:#f92672">+</span> <span style="color:#e6db74">&#34;: &#34;</span> <span style="color:#f92672">+</span> build_path_helper(mft, filename_attribute))
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">build_path_helper</span>(mft, filename_attribute):
+</span></span><span style="display:flex;"><span>    path <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;&#34;</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">while</span> <span style="color:#66d9ef">True</span>
+</span></span><span style="display:flex;"><span>        path <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;</span><span style="color:#ae81ff">\\</span><span style="color:#e6db74">&#34;</span> <span style="color:#f92672">+</span> filename_attribute<span style="color:#f92672">.</span>get_field(<span style="color:#e6db74">&#34;Filename&#34;</span>) <span style="color:#f92672">+</span> path
+</span></span><span style="display:flex;"><span>        parent_record <span style="color:#f92672">=</span> mft<span style="color:#f92672">.</span>get_record_at(filename_attribute<span style="color:#f92672">.</span>get_field(<span style="color:#e6db74">&#34;Parent index&#34;</span>))
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> is_root_directory(parent_record):
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">break</span>
+</span></span><span style="display:flex;"><span>        
+</span></span><span style="display:flex;"><span>        parent_sequence <span style="color:#f92672">=</span> parent_record<span style="color:#f92672">.</span>get_sequence_number()
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> <span style="color:#f92672">not</span> parent_record<span style="color:#f92672">.</span>is_used():
+</span></span><span style="display:flex;"><span>            parent_sequence <span style="color:#f92672">-=</span> <span style="color:#ae81ff">1</span>
+</span></span><span style="display:flex;"><span>        
+</span></span><span style="display:flex;"><span>        parent_filename_attributes <span style="color:#f92672">=</span> []
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># if parent record still belongs to my parent, get its filename attributes</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> parent_sequence <span style="color:#f92672">==</span> filename_attribute<span style="color:#f92672">.</span>get_field(<span style="color:#e6db74">&#34;Parent sequence&#34;</span>):
+</span></span><span style="display:flex;"><span>            parent_filename_attributes <span style="color:#f92672">=</span> parent_record<span style="color:#f92672">.</span>get_filename_attributes()
+</span></span><span style="display:flex;"><span>        
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># get the filename attributes from any extension records of my parent</span>
+</span></span><span style="display:flex;"><span>        parent_filename_attributes <span style="color:#f92672">+=</span> get_extension_filename_attributes(
+</span></span><span style="display:flex;"><span>        	parent_record<span style="color:#f92672">.</span>get_mft_index(),
+</span></span><span style="display:flex;"><span>            parent_sequence
+</span></span><span style="display:flex;"><span>        )
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> <span style="color:#f92672">not</span> parent_filename_attributes:
+</span></span><span style="display:flex;"><span>	        <span style="color:#75715e"># could not find a $FILE_NAME attribute of my parent</span>
+</span></span><span style="display:flex;"><span>            path <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;</span><span style="color:#ae81ff">\\</span><span style="color:#e6db74">$OrphanFiles&#34;</span> <span style="color:#f92672">+</span> path 
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">break</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># prioritize LFNs when choosing a name for the parent</span>
+</span></span><span style="display:flex;"><span>        filename_attribute <span style="color:#f92672">=</span> max(parent_filename_attributes, key<span style="color:#f92672">=</span>get_priority)        
+</span></span><span style="display:flex;"><span>        
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> <span style="color:#e6db74">&#34;.&#34;</span> <span style="color:#f92672">+</span> path
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">get_extension_filename_attributes</span>(base_index, base_sequence):
+</span></span><span style="display:flex;"><span>    extension_records <span style="color:#f92672">=</span>  map(
+</span></span><span style="display:flex;"><span>    	mft<span style="color:#f92672">.</span>get_record_at, 
+</span></span><span style="display:flex;"><span>    	extension_records[(base_index, base_sequence)]
+</span></span><span style="display:flex;"><span>    )
+</span></span><span style="display:flex;"><span>    
+</span></span><span style="display:flex;"><span>    filename_attributes <span style="color:#f92672">=</span> []
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">for</span> record <span style="color:#f92672">in</span> extension_records:
+</span></span><span style="display:flex;"><span>        filename_attributes <span style="color:#f92672">+=</span> record<span style="color:#f92672">.</span>get_filename_attributes()
+</span></span><span style="display:flex;"><span>    
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> filename_attributes
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">get_priority</span>(filename_attribute):
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span> filename_attribute<span style="color:#f92672">.</span>get_field(<span style="color:#e6db74">&#34;Name space&#34;</span>) <span style="color:#f92672">==</span> <span style="color:#e6db74">&#34;DOS&#34;</span>:
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">return</span> <span style="color:#ae81ff">0</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">else</span>:
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">return</span> <span style="color:#ae81ff">1</span>
+</span></span></code></pre></div><p>In the previous version, we built paths using the long file name (LFN) of each folder, because the long names are more meaningful than the auto-generated short names. Now we know that the <code>$FILE_NAME</code> attribute containing the short name may be the only <code>$FILE_NAME</code> attribute left after some of a folder&rsquo;s records were reused.</p>
+<p>In this new version, we prioritize LFN <code>$FILE_NAME</code> attributes, but we will use the SFN <code>$FILE_NAME</code> attribute if it&rsquo;s the only one left.</p>
+<h2 id="epilogue">Epilogue</h2>
+<p>This post was my attempt to create the resource I wish I had when I wrote my MFT parser. MFT parsing is such a fundamental technique in forensics; yet, the resources to learn it are lacking. People have been writing MFT parsers for years, each one on their own, rediscovering the same edge cases and learning the same lessons again and again.</p>
+<p>It really shouldn&rsquo;t be like that. I think we DFIR programmers have a lot to learn in sharing our knowledge with one another, so we can push the field forward, together.</p>
+]]></content:encoded>
+    </item>
+    
+  </channel>
+</rss>

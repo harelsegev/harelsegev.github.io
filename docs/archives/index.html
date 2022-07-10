@@ -26,34 +26,6 @@
         }
 
     </style>
-    <style>
-        @media (prefers-color-scheme: dark) {
-            :root {
-                --theme: rgb(29, 30, 32);
-                --entry: rgb(46, 46, 51);
-                --primary: rgb(218, 218, 219);
-                --secondary: rgb(155, 156, 157);
-                --tertiary: rgb(65, 66, 68);
-                --content: rgb(196, 196, 197);
-                --hljs-bg: rgb(46, 46, 51);
-                --code-bg: rgb(55, 56, 62);
-                --border: rgb(51, 51, 51);
-            }
-
-            .list {
-                background: var(--theme);
-            }
-
-            .list:not(.dark)::-webkit-scrollbar-track {
-                background: 0 0;
-            }
-
-            .list:not(.dark)::-webkit-scrollbar-thumb {
-                border-color: var(--theme);
-            }
-        }
-
-    </style>
 </noscript><meta property="og:title" content="Archive" />
 <meta property="og:description" content="archives" />
 <meta property="og:type" content="article" />
@@ -115,14 +87,10 @@
 </script>
 </head>
 
-<body class="list" id="top">
+<body class="list dark" id="top">
 <script>
-    if (localStorage.getItem("pref-theme") === "dark") {
-        document.body.classList.add('dark');
-    } else if (localStorage.getItem("pref-theme") === "light") {
+    if (localStorage.getItem("pref-theme") === "light") {
         document.body.classList.remove('dark')
-    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-        document.body.classList.add('dark');
     }
 
 </script>
@@ -184,11 +152,17 @@
   <h1>Archive</h1>
 </header>
 <div class="archive-year">
-  <h2 class="archive-year-header">2022<sup class="archive-count">&nbsp;&nbsp;1</sup>
+  <h2 class="archive-year-header">2022<sup class="archive-count">&nbsp;&nbsp;2</sup>
   </h2>
   <div class="archive-month">
-    <h3 class="archive-month-header">July<sup class="archive-count">&nbsp;&nbsp;1</sup></h3>
+    <h3 class="archive-month-header">July<sup class="archive-count">&nbsp;&nbsp;2</sup></h3>
     <div class="archive-posts">
+      <div class="archive-entry">
+        <h3 class="archive-entry-title">Resolving File Paths Using The MFT
+        </h3>
+        <div class="archive-meta"><span title='2022-07-07 00:00:00 +0000 UTC'>July 7, 2022</span>&nbsp;·&nbsp;16 min&nbsp;·&nbsp;3337 words&nbsp;·&nbsp;Harel Segev</div>
+        <a class="entry-link" aria-label="post link to Resolving File Paths Using The MFT" href="http://harelsegev.github.io/posts/resolving-file-paths-using-the-mft/"></a>
+      </div>
       <div class="archive-entry">
         <h3 class="archive-entry-title">Home Adventures! A Prefetch File in $I30 Slack, PyInstaller &amp; Prefetch Hash Cracking
         </h3>

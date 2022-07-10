@@ -29,34 +29,6 @@
         }
 
     </style>
-    <style>
-        @media (prefers-color-scheme: dark) {
-            :root {
-                --theme: rgb(29, 30, 32);
-                --entry: rgb(46, 46, 51);
-                --primary: rgb(218, 218, 219);
-                --secondary: rgb(155, 156, 157);
-                --tertiary: rgb(65, 66, 68);
-                --content: rgb(196, 196, 197);
-                --hljs-bg: rgb(46, 46, 51);
-                --code-bg: rgb(55, 56, 62);
-                --border: rgb(51, 51, 51);
-            }
-
-            .list {
-                background: var(--theme);
-            }
-
-            .list:not(.dark)::-webkit-scrollbar-track {
-                background: 0 0;
-            }
-
-            .list:not(.dark)::-webkit-scrollbar-thumb {
-                border-color: var(--theme);
-            }
-        }
-
-    </style>
 </noscript><meta property="og:title" content="RAT In Mi Kitchen" />
 <meta property="og:description" content="" />
 <meta property="og:type" content="website" />
@@ -81,14 +53,10 @@
 </script>
 </head>
 
-<body class="list" id="top">
+<body class="list dark" id="top">
 <script>
-    if (localStorage.getItem("pref-theme") === "dark") {
-        document.body.classList.add('dark');
-    } else if (localStorage.getItem("pref-theme") === "light") {
+    if (localStorage.getItem("pref-theme") === "light") {
         document.body.classList.remove('dark')
-    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-        document.body.classList.add('dark');
     }
 
 </script>
@@ -173,6 +141,19 @@
 </div>
 
     </footer>
+</article>
+
+<article class="post-entry"> 
+  <header class="entry-header">
+    <h2>Resolving File Paths Using The MFT
+    </h2>
+  </header>
+  <div class="entry-content">
+    <p>In NTFS, the MFT (Master File Table) is a structure that contains a lot of the file-system metadata, and also the contents of small files. It is stored in a special file, called $MFT. In incident response, we often collect and parse this file to determine the file system contents and how it changed over time, without having to acquire a full disk image.
+There are many bad MFT parsers out there....</p>
+  </div>
+  <footer class="entry-footer"><span title='2022-07-07 00:00:00 +0000 UTC'>July 7, 2022</span>&nbsp;·&nbsp;16 min&nbsp;·&nbsp;3337 words&nbsp;·&nbsp;Harel Segev</footer>
+  <a class="entry-link" aria-label="post link to Resolving File Paths Using The MFT" href="http://harelsegev.github.io/posts/resolving-file-paths-using-the-mft/"></a>
 </article>
 
 <article class="post-entry"> 
