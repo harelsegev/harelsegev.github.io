@@ -325,13 +325,13 @@ After we created this dictionary, we have to loop over the MFT one more time. Th
 
 As always, deleted files create problems. When a file is deleted, its base record and all of its extension records are marked as free. The problem is - all of those free records are not going to be reused all at the same time. If some, but not all of the records are reused, we loose some, but not all of the file's attributes. This has major consequences on MFT parsing in general, and on path reconstruction in particular.
 
-We may find a file without any `$FILE_NAME` attributes. For such a file, path reconstruction is impossible. The best you can do is give it a unique identifier. You may then be tempted to place it in the $OrphanFiles folder, but that wouldn't be right -  it's not necessarily orphan. Sure, it's deleted, but its parent folder might not be.
+We may find a file without any `$FILE_NAME` attributes. For such a file, path reconstruction is impossible. The best you can do is give it a unique identifier. You may be tempted to place it in the $OrphanFiles folder, but that wouldn't be right -  it's not necessarily orphan. Sure, it's deleted, but its parent folder might not be.
 
 If you find a **folder** without any `$FILE_NAME` attributes, you may also find deleted files that were once inside it. Those files can be safely placed in the $OrphanFiles folder, because their parent is definitely deleted, and we didn't output a path for it.
 
 ### Orphaned Attributes
 
-If we find a `$FILE_NAME` attribute with an invalid parent reference, it means the file is orphan, right? Well, yes -but we can do better than this. Before declaring the file as orphan, we should check whether its parent has any extension records left, and whether there's a `$FILE_NAME` attribute in one of them; if there is, we can resolve the file's path, even though the parent folder's base record was reused!
+To resolve the parent folder of a file, we validate the parent reference in its `$FILE_NAME` attribute. If it's not valid, it means the file is orphan, right? Well, yes - but we can do better than this. Before declaring the file as orphan, we should check whether its parent has any extension records left, and whether there's a `$FILE_NAME` attribute in one of them; if there is, we can resolve the file's path, even if the parent folder's base record was reused!
 
 This is the final version of our code. It handles everything we talked about so far: orphan files, hard links and extension records:
 
