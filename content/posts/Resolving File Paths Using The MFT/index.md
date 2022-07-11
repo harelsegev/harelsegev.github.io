@@ -288,11 +288,11 @@ def build_path(mft, current_record):
 
 ### Extension Records
 
-If a file becomes extremely large and fragmented, or has many hard links and data streams, a single file record may not be big enough to contain all of its attributes. In such case, the file will occupy additional file records. The main record is called the *Base Record*, and the additional ones are called *Extension Records*. The base record will contain a special attribute, called `$ATTRIBUTE_LIST`, which stores the information needed to find the rest of the file's attributes.
+If a file becomes extremely large and fragmented, or has many hard links, a single file record may not be big enough to contain all of its attributes. In such case, the file will occupy additional file records. The file's main record is called the *Base Record*, and the additional ones are called *Extension Records*. When some of a file's attributes are stored in extension records, its base record contains a special attribute, called `$ATTRIBUTE_LIST`, which stores the information needed to find them.
 
-Some MFT parsers use the `$ATTRIBUTE_LIST` attribute in the base record to find its extension records. However, this is a major mistake, because `$ATTRIBUTE_LIST` attributes can be non-resident (stored outside the MFT). Instead, we'll take the opposite approach - find the extension records, and trace them back to their base record.
+Some MFT parsers use the `$ATTRIBUTE_LIST` attribute in the base record to find its extension records. This is a major mistake, because `$ATTRIBUTE_LIST` attributes can be non-resident (stored outside the MFT). Instead, we'll take the opposite approach - find the extension records, and trace them back to their base record.
 
-Conveniently, the file record header contains a `Base index` and `Base sequence` fields, to store a file reference to the base record. In base records, these fields are zeroed out. This means we can also use them to differentiate base records from extension records, without having to check for a `$ATTRIBUTE_LIST` attribute.
+Conveniently, the file-record header contains a `Base index` and `Base sequence` fields, to store a file reference to the base record. In base records, these fields are zeroed out. This means we can also use them to differentiate base records from extension records, without having to check for a `$ATTRIBUTE_LIST` attribute.
 
 By looping over the MFT, we can create a mapping of base records to extension records:
 
@@ -319,19 +319,19 @@ def is_base_record(current_record):
             current_record.get_base_record_sequeunce() == 0)
 ```
 
-After we created this dictionary, we have to loop over the MFT one more time. This time, looking for base records. For each base record, we should build a path for all the `$FILE_NAME` attributes both in it, and in its extension records - if it has any.
+After we create this dictionary, we have to loop over the MFT one more time. This time, looking for base records. For each base record, we will build a path for all the `$FILE_NAME` attributes both in it, and in its extension records - if it has any.
 
 ### Missing Attributes
 
-As always, deleted files create problems. When a file is deleted, its base record and all of its extension records are marked as free. The problem is - all of those free records are not going to be reused all at the same time. If some, but not all of the records are reused, we loose some, but not all of the file's attributes. This has major consequences on MFT parsing in general, and on path reconstruction in particular.
+As always, deleted files create problems. When a file is deleted, its base record and all of its extension records are marked as free. The problem is - all of those free records are not going to be reused all at the same time. If some, but not all of the file's records are reused - we loose some, but not all of the file's attributes. This has major consequences on MFT parsing in general, and on path reconstruction in particular.
 
 We may find a file without any `$FILE_NAME` attributes. For such a file, path reconstruction is impossible. The best you can do is give it a unique identifier. You may be tempted to place it in the $OrphanFiles folder, but that wouldn't be right -  it's not necessarily orphan. Sure, it's deleted, but its parent folder might not be.
 
-If you find a **folder** without any `$FILE_NAME` attributes, you may also find deleted files that were once inside it. Those files can be safely placed in the $OrphanFiles folder, because their parent is definitely deleted, and we didn't output a path for it.
+If you find a **folder** without any `$FILE_NAME` attributes, you may also find deleted files that were once inside it. Those files can be safely placed in the $OrphanFiles folder, because the folder is deleted, and we won't output a path for it.
 
 ### Orphaned Attributes
 
-To resolve the parent folder of a file, we validate the parent reference in its `$FILE_NAME` attribute. If it's not valid, it means the file is orphan, right? Well, yes - but we can do better than this. Before declaring the file as orphan, we should check whether its parent has any extension records left, and whether there's a `$FILE_NAME` attribute in one of them; if there is, we can resolve the file's path, even if the parent folder's base record was reused!
+To resolve the parent folder for a file, we validate the parent reference in its `$FILE_NAME` attribute. If it's not valid, it means the file is orphan, right? Well, yes - but we can do better than that. Before declaring the file is orphan, we should check whether its parent has any extension records left. If there's a `$FILE_NAME` attribute in one of them, we can use it to resolve the file's path.
 
 This is the final version of our code. It handles everything we talked about so far: orphan files, hard links and extension records:
 
@@ -433,7 +433,7 @@ def get_priority(filename_attribute):
 
 In the previous version, we built paths using the long file name (LFN) of each folder, because the long names are more meaningful than the auto-generated short names. Now we know that the `$FILE_NAME` attribute containing the short name may be the only `$FILE_NAME` attribute left after some of a folder's records were reused.
 
-In this new version, we prioritize LFN `$FILE_NAME` attributes, but we will use the SFN `$FILE_NAME` attribute if it's the only one left.
+In this new version, we prioritize the LFN `$FILE_NAME` attributes, but we will use the SFN `$FILE_NAME` attribute if it's the only one left.
 
 ## Closing Thoughts
 
