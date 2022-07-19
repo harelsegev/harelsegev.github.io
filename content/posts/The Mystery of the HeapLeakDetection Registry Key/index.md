@@ -6,11 +6,11 @@ tags: ["Registry", "Reverse Engineering"]
 draft: true
 ---
 
-I was working on a case the other day when I first came across a rather interesting registry key, `HKLM\Software\Microsoft\RADAR\HeapLeakDetection\DiagnosedApplications`. It caught my eye, because it has sub-keys for (what appears to be) applications executed on the system. This is what it looks like on my own system:
+I was working on a case the other day, when I first came across a rather interesting registry key, `HKLM\Software\Microsoft\RADAR\HeapLeakDetection\DiagnosedApplications`. It caught my eye, because it has sub-keys for (what appears to be) applications executed on the system. This is what it looks like on my own system:
 
 ![](images/regedit_key_hierarchy.png)
 
-There are quite a few sub-keys, and each has a *LastDetectionTime* QWORD value, containing what appears to be a Windows FILETIME timestamp:
+It has quite a few sub-keys, and each one has a *LastDetectionTime* QWORD value, containing what appears to be a Windows FILETIME timestamp:
 
 ![](images/regedit_last_detection_time.png)
 
@@ -21,7 +21,7 @@ RADAR is surprisingly old; it was introduced in Windows Vista. Nevertheless, I c
 * Under what conditions is a sub-key created beneath the *DiagnosedApplications* key?
 * Under what conditions is the *LastDetectionTime* value updated?
 
-My research was conducted on a Windows 10 machine, and may not apply to prior versions of Windows.
+My research was conducted on Windows 10 machines, and may not apply to prior versions of Windows.
 
 ## Looking at the Settings
 
@@ -29,28 +29,67 @@ Luckily, there's a *Settings* key beneath the *HeapLeakDetection* key:
 
 ![](images/regedit_settings.png)
 
-Settings are always helpful when you're trying to figure out how something works. Looking at these values, I already had some hypotheses, but I needed more information before I could confirm or disproof anything. Using Procmon, I was able to  pinpoint the DLL which manages the *DiagnosedApplications* registry key, *radardt.dll*:
+Settings are always helpful when you're trying to figure out how something works. Looking at these values, I already had some hypotheses. I figured whether an application is diagnosed has something to do with the amount of memory it allocated. I had a guess that *CommitFloor* and *CommitCeiling* are actually in megabytes, and that the amount of committed memory has to lie between them for a process to be registered. That lead me to write a little C program, to test this theory:
+
+```c
+#include<stdio.h>
+#include<Windows.h>
+
+int main() {
+    // set nAllocatedSize to be between CommitFloor and CommitCeiling
+    size_t nAllocatedSize = 1024 * 1024 * 250;
+    
+    if(VirtualAlloc(NULL, nAllocatedSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE)) {
+        printf("Committed 250 MB of memory\n");
+        
+        while(1) {
+            printf("Sleeping...\n");
+            Sleep(5000);
+        }
+    }
+}
+```
+
+I executed the binary both on my computer at home, and on the one in my office - and the results threw me off completely. It was registered immediately on my computer at home, but wasn't on the one in my office. They're both running the same Windows 10 version, so what's going on?
+
+
+
+## Reverse Engineering *RdrpReadHeapLeakSettings*
+
+I needed more information to figure this out. Using Procmon, I was able to pinpoint the DLL which manages the *DiagnosedApplications* registry key, *radardt.dll*:
 
 ![](images/procmon.png)
 
-### Reverse Engineering *RdrpReadHeapLeakSettings*
-
-I started my analysis of the *RdrpReadHeapLeakSettings* function in *radardt.dll*, because I wanted to understand the settings better. Take *DetectionInterval*, for example; it's 0x1E, or 30 in decimal - but 30 what? seconds? minutes? I had no idea.
+I figured I should start my analysis in the *RdrpReadHeapLeakSettings* function. I hoped it would help me understand the settings better. Take *DetectionInterval*, for example; it's 0x1E, or 30 decimal - but 30 what? seconds? minutes? I had no idea.
 
 ![](images/physics_meme.png)
 
-This turned out to be a great idea, because the function transforms each value in a way that enabled me to understand what it means. Take *CommitFloor*, for example. After reading it from the registry, it is multiplied by 1048576, which is 1024 squared. This tells me that *CommitFloor* is stored in megabytes.
+This turned out to be a great idea, because the function transforms each value in a way that enabled me to understand what it means. For example, the *DetectionInterval* value is multiplied by 86400 after it is read from the registry. 86400 happens to be 60 * 60 * 24. This means *DetectionInterval* is stored days, and is converted to seconds:
 
-![](images/cutter_CommitFloor.png)
+![](images/ida32_DetectionInterval.png)
 
-These were my conclusions, after analyzing the entire function:
+In a similar fashion, I was able to conclude that *TimerInterval* is in minutes.
 
-* *CommitFloor* and *CommitCeiling* are in MBs.
-* *CommitThreshold* can be from 1 to 100 (including 1 and 100), and is set to 5 by default.
-* *DetectionInterval* is in days. It can be a DWORD or a QWORD.
-* *MaxReports* is set to 1 in case the value doesn't exist.
-* *TimerInterval* is in minutes.
+*DetectionInterval* is stored in a global variable after it's converted to seconds - to make it available for other functions to use. This is also the case for *CommitThreshold*, *MaxReports* and *TimerInterval*. However, both *CommitFloor* and *CommitCeiling* aren't stored anywhere after they're read. That lead me to believe they aren't actually used at all!
 
+The next value I looked at is *CommitThreshold*, which seems to be 5 by default. After it is read from the registry, the function checks if it's between 1 to 100:
 
+![](images/ida64_CommitThreshold_01.png)
 
- They have something to do with the amount of committed memory a process has.
+After that, there's a call to *NtQuerySystemInformation* to get a *SystemBasicInformation* struct. Unfortunately, the structure of this struct is not documented on MSDN:
+
+![](images/msdn_SystemBasicInformation.png)
+
+Nevertheless, I found documentation for it on some other, more questionable website. Then, I was able to define it as a struct in IDA Pro. What I found then, was the explanation to the confusing results of my test:
+
+![](images/ida64_CommitThreshold_02.png)
+
+*CommitThreshold* is multiplied by `(PageSize * NumberOfPhysicalPages) / 100`. That lead me to conclude it's the amount of memory an application has to commit in order to get diagnosed, as a percentage of the total amount of physical memory on the system.
+
+I was able to verify this theory through further testing. This artifact behaves differently depending on the amount of RAM you have installed. My computer at home has 4GB, but the one in my office has 8GB. The 250MB my test application allocated are more than 5 percent out of the 4GB I have at home, but not out of the 8GB I have at my office.
+
+## Conclusions
+
+The Memory Leak Diagnoser is triggered every *TimerInverval* minutes (5, by default). If it detects a process which has a large enough amount of committed memory - more than *CommitThreshold* (5, by default) percent of the amount of installed RAM, it creates a key  for it under `DiagnosedApplications`, if there isn't one already.
+
+If a key exists already, the `LastDetectionTime` value is updated only if at least 30 days have passed since the last detection.
