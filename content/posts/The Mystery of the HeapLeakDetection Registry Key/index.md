@@ -21,7 +21,7 @@ RADAR is surprisingly old; it was introduced in Windows Vista. Nevertheless, I c
 * Under what conditions is a sub-key created beneath the *DiagnosedApplications* key?
 * Under what conditions is the *LastDetectionTime* value updated?
 
-My research was conducted on Windows 10 machines, and may not apply to prior versions of Windows.
+My research was conducted on Windows 10 machines, and thus may not apply to prior versions of Windows.
 
 ## Looking at the Settings
 
@@ -50,13 +50,13 @@ int main() {
 }
 ```
 
-I executed the binary both on my computer at home, and on the one in my office - and the results threw me off completely. It was registered immediately on my computer at home, but wasn't on the one in my office. They're both running the same Windows 10 version, so what's going on?
+I executed the binary both on my computer at home, and on a computer in my office - and the results threw me off completely. On my computer at home, it was registered after a few minutes; but on the computer in my office, it wasn't registered at all. They're both running the same Windows 10 version, so what's going on?
 
 
 
 ## Reverse Engineering *RdrpReadHeapLeakSettings*
 
-I needed more information to figure this out. Using Procmon, I was able to pinpoint the DLL which manages the *DiagnosedApplications* registry key, *radardt.dll*:
+To figure this out, I needed more information. Using Procmon, I was able to pinpoint the DLL which manages the *DiagnosedApplications* registry key, *radardt.dll*:
 
 ![](images/procmon.png)
 
@@ -68,9 +68,9 @@ This turned out to be a great idea, because the function transforms each value i
 
 ![](images/ida32_DetectionInterval.png)
 
-In a similar fashion, I was able to conclude that *TimerInterval* is in minutes.
+In a similar fashion, I was able to conclude that *TimerInterval* is stored in minutes.
 
-*DetectionInterval* is stored in a global variable after it's converted to seconds - to make it available for other functions to use. This is also the case for *CommitThreshold*, *MaxReports* and *TimerInterval*. However, both *CommitFloor* and *CommitCeiling* aren't stored anywhere after they're read. That lead me to believe they aren't actually used at all!
+*DetectionInterval* is stored in a global variable after it's converted to seconds - to make it available for other functions to use. This is also the case for *CommitThreshold*, *MaxReports* and *TimerInterval*. However, both *CommitFloor* and *CommitCeiling* aren't stored anywhere after they're read. I doubt whether they're actually used at all.
 
 The next value I looked at is *CommitThreshold*, which seems to be 5 by default. After it is read from the registry, the function checks if it's between 1 to 100:
 
@@ -86,10 +86,16 @@ Nevertheless, I found documentation for it on some other, more questionable webs
 
 *CommitThreshold* is multiplied by `(PageSize * NumberOfPhysicalPages) / 100`. That lead me to conclude it's the amount of memory an application has to commit in order to get diagnosed, as a percentage of the total amount of physical memory on the system.
 
-I was able to verify this theory through further testing. This artifact behaves differently depending on the amount of RAM you have installed. My computer at home has 4GB, but the one in my office has 8GB. The 250MB my test application allocated are more than 5 percent out of the 4GB I have at home, but not out of the 8GB I have at my office.
+I was able to verify this theory through further testing. This artifact behaves differently depending on the amount of RAM installed. The 250MBs my test application allocates are more than 5 percent out of the 4GBs of RAM installed in my computer at home, but they're less than 5 percent out of the 8GBs installed in the computer at my office.
+
+
+
+## Reverse Engineering *RdrpIdentifyTargetProcess*
+
+lala
 
 ## Conclusions
 
-The Memory Leak Diagnoser is triggered every *TimerInverval* minutes (5, by default). If it detects a process which has a large enough amount of committed memory - more than *CommitThreshold* (5, by default) percent of the amount of installed RAM, it creates a key  for it under `DiagnosedApplications`, if there isn't one already.
+The Memory Leak Diagnoser is triggered every *TimerInverval* minutes. When triggered, it gets a list of all running processes, and sorts it by amount of committed memory. Then, it chooses the first process on the list which has committed at least *CommitThreshold* percent out of the total amount of physical memory, and that wasn't already chosen in the last *DetectionInterval* days.
 
-If a key exists already, the `LastDetectionTime` value is updated only if at least 30 days have passed since the last detection.
+A sub-key beneath the *DiagnosedApplications* key is then created (if it doesn't exist already) for the chosen process, and the *LastDetectionTime* is updated.
