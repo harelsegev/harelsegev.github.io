@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>Reverse Engineering on RAT In Mi Kitchen</title>
+    <link>http://harelsegev.github.io/tags/reverse-engineering/</link>
+    <description>Recent content in Reverse Engineering on RAT In Mi Kitchen</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <lastBuildDate>Wed, 20 Jul 2022 00:00:00 +0000</lastBuildDate><atom:link href="http://harelsegev.github.io/tags/reverse-engineering/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>The Mystery of the HeapLeakDetection Registry Key</title>
+      <link>http://harelsegev.github.io/posts/the-mystery-of-the-heapleakdetection-registry-key/</link>
+      <pubDate>Wed, 20 Jul 2022 00:00:00 +0000</pubDate>
+      
+      <guid>http://harelsegev.github.io/posts/the-mystery-of-the-heapleakdetection-registry-key/</guid>
+      <description>I was working on a case the other day, when I first came across a rather interesting registry key, HKLM\Software\Microsoft\RADAR\HeapLeakDetection\DiagnosedApplications. It caught my eye, because it has sub-keys for (what appears to be) applications executed on the system. This is what it looks like on my own system:
+It has quite a few sub-keys, and each one has a LastDetectionTime QWORD value, containing what appears to be a Windows FILETIME timestamp:</description>
+      <content:encoded><![CDATA[<p>I was working on a case the other day, when I first came across a rather interesting registry key, <code>HKLM\Software\Microsoft\RADAR\HeapLeakDetection\DiagnosedApplications</code>. It caught my eye, because it has sub-keys for (what appears to be) applications executed on the system. This is what it looks like on my own system:</p>
+<p><img loading="lazy" src="images/regedit_key_hierarchy.png" alt=""  />
+</p>
+<p>It has quite a few sub-keys, and each one has a <em>LastDetectionTime</em> QWORD value, containing what appears to be a Windows FILETIME timestamp:</p>
+<p><img loading="lazy" src="images/regedit_last_detection_time.png" alt=""  />
+</p>
+<p>This key is associated with the Memory Leak Diagnoser component of Windows Resource Exhaustion Detection and Resolution (RADAR). RADAR is a technology embedded in Windows to detect memory leaks in real-time, so that data can be collected and used to correct issues in applications.</p>
+<p>RADAR is surprisingly old; it was introduced in Windows Vista. Nevertheless, I couldn&rsquo;t find any research into this registry key - so I had to conduct my own. With forensics in mind, I tried to answer these 2 questions:</p>
+<ul>
+<li>Under what conditions is a sub-key created beneath the <em>DiagnosedApplications</em> key?</li>
+<li>Under what conditions is the <em>LastDetectionTime</em> value updated?</li>
+</ul>
+<p>My research was conducted on Windows 10 machines, and therefore may not apply to prior versions of Windows.</p>
+<h2 id="looking-at-the-settings">Looking at the Settings</h2>
+<p>Luckily, there&rsquo;s a <em>Settings</em> key beneath the <em>HeapLeakDetection</em> key:</p>
+<p><img loading="lazy" src="images/regedit_settings.png" alt=""  />
+</p>
+<p>Settings are always helpful when you&rsquo;re trying to figure out how something works. Looking at these values, I already had some hypotheses. I figured whether an application is diagnosed has something to do with the amount of memory it allocated.</p>
+<p>I had a guess that <em>CommitFloor</em> and <em>CommitCeiling</em> are actually in megabytes, and that the amount of committed memory has to lie between them for a process to be registered. That lead me to write a little C program, to test this theory:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#75715e">#include</span><span style="color:#75715e">&lt;stdio.h&gt;</span><span style="color:#75715e">
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">#include</span><span style="color:#75715e">&lt;Windows.h&gt;</span><span style="color:#75715e">
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">int</span> <span style="color:#a6e22e">main</span>() {
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">// set nAllocatedSize to be between CommitFloor and CommitCeiling
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    size_t nAllocatedSize <span style="color:#f92672">=</span> <span style="color:#ae81ff">1024</span> <span style="color:#f92672">*</span> <span style="color:#ae81ff">1024</span> <span style="color:#f92672">*</span> <span style="color:#ae81ff">250</span>;
+</span></span><span style="display:flex;"><span>    
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span>(VirtualAlloc(NULL, nAllocatedSize, MEM_RESERVE <span style="color:#f92672">|</span> MEM_COMMIT, PAGE_READWRITE)) {
+</span></span><span style="display:flex;"><span>        printf(<span style="color:#e6db74">&#34;Committed 250 MB of memory</span><span style="color:#ae81ff">\n</span><span style="color:#e6db74">&#34;</span>);
+</span></span><span style="display:flex;"><span>        
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">while</span>(<span style="color:#ae81ff">1</span>) {
+</span></span><span style="display:flex;"><span>            printf(<span style="color:#e6db74">&#34;Sleeping...</span><span style="color:#ae81ff">\n</span><span style="color:#e6db74">&#34;</span>);
+</span></span><span style="display:flex;"><span>            Sleep(<span style="color:#ae81ff">5000</span>);
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>I executed the binary on 2 of my machines, and the results threw me off completely. On one of them, it was registered after a few minutes - but on the other one it wasn&rsquo;t registered at all. They&rsquo;re both running the same Windows 10 version, so what&rsquo;s going on?</p>
+<h2 id="reverse-engineering-rdrpreadheapleaksettings">Reverse Engineering <em>RdrpReadHeapLeakSettings</em></h2>
+<p>To figure this out, I needed more information. Using Procmon, I was able to pinpoint the DLL which manages the <em>DiagnosedApplications</em> registry key:</p>
+<p><img loading="lazy" src="images/procmon.png" alt=""  />
+</p>
+<p>I figured I should start my analysis in the <em>RdrpReadHeapLeakSettings</em> function. I hoped it would help me understand the settings better. Take <em>DetectionInterval</em>, for example; it&rsquo;s 0x1E, or 30 decimal - but 30 what? seconds? minutes? I had no idea.</p>
+<p><img loading="lazy" src="images/physics_meme.png" alt=""  />
+</p>
+<p>This turned out to be a great idea, because the function transforms each value in a way that enabled me to understand what it means. For example, the <em>DetectionInterval</em> value is multiplied by 86400 after it is read from the registry. 86400 happens to be 60 * 60 * 24. This means <em>DetectionInterval</em> is stored days, and is converted to seconds:</p>
+<p><img loading="lazy" src="images/ida32_DetectionInterval.png" alt=""  />
+</p>
+<p>In a similar fashion, I was able to conclude that <em>TimerInterval</em> is stored in minutes.</p>
+<p><em>DetectionInterval</em> is stored in a global variable after it&rsquo;s converted to seconds - to make it available for other functions to use. This is also the case for <em>CommitThreshold</em>, <em>MaxReports</em> and <em>TimerInterval</em>. However, both <em>CommitFloor</em> and <em>CommitCeiling</em> aren&rsquo;t stored anywhere after they&rsquo;re read. I doubt whether they&rsquo;re actually used at all!</p>
+<p>The next value I looked at is <em>CommitThreshold</em>, which seems to be 5 by default. After it is read from the registry, the function checks if it&rsquo;s between 1 to 100:</p>
+<p><img loading="lazy" src="images/ida64_CommitThreshold_01.png" alt=""  />
+</p>
+<p>After that, there&rsquo;s a call to <em>NtQuerySystemInformation</em> to get a <em>SystemBasicInformation</em> struct. Unfortunately, the structure of this struct is not documented on MSDN:</p>
+<p><img loading="lazy" src="images/msdn_SystemBasicInformation.png" alt=""  />
+</p>
+<p>Nevertheless, I found documentation for it on some other, rather questionable website. Then, I was able to define it as a struct in IDA Pro. What I found then, was the explanation to the confusing results of my test:</p>
+<p><img loading="lazy" src="images/ida64_CommitThreshold_02.png" alt=""  />
+</p>
+<p><em>CommitThreshold</em> is multiplied by <code>(PageSize * NumberOfPhysicalPages) / 100</code>. That lead me to conclude it&rsquo;s the amount of memory an application has to commit in order to get diagnosed, as a percentage of the total amount of physical memory on the system.</p>
+<p>I was able to verify this theory through further testing. This artifact behaves differently depending on the amount of RAM installed in the machine.</p>
+<p>The 250MBs my test application allocated are more than 5 percent out of the 4GBs of RAM installed in the first machine I tested on, but they&rsquo;re less than 5 percent out of the 8GBs installed in my other machine.</p>
+<h2 id="looking-at-rdrpidentifytargetprocess">Looking at <em>RdrpIdentifyTargetProcess</em></h2>
+<p>What happens if the Memory Leak Diagnoser is triggered, and there are multiple processes with a high enough amount of committed memory to be diagnosed? Well, only one of them is chosen to be registered. I wanted to figure out how this choice is made, so the next function I looked at was <em>RdrpIdentifyTargetProcess</em>.</p>
+<p>First, it calls <em>RdrpGetProcessInformation</em>, which in turn uses the <em>NtQuerySystemInformation</em> API call; this time - to get an array of <em>SYSTEM_PROCESS_INFORMATION</em> structures, one for each running process:</p>
+<p><img loading="lazy" src="images/ida32_process_list.png" alt=""  />
+</p>
+<p>These structures contain information about the resource usage of each process. Later, it seems like this array is sorted by the amount of committed memory in each process:</p>
+<p><img loading="lazy" src="images/ida32_qsort.png" alt=""  />
+</p>
+<h2 id="answering-my-research-questions">Answering my Research Questions</h2>
+<p>At this point, I had a solid and complete theory, which I have tested and verified:</p>
+<p>The Memory Leak Diagnoser is triggered every <em>TimerInverval</em> minutes. When triggered, it gets a list of all running processes, and sorts them by their amount of committed memory (in descending order). Then, it chooses the first process on the list which:</p>
+<ul>
+<li>Has committed at least <em>CommitThreshold</em> percent out of the total amount of physical memory installed.</li>
+<li>Wasn&rsquo;t already chosen in the last <em>DetectionInterval</em> days.</li>
+</ul>
+<p>A sub-key beneath the <em>DiagnosedApplications</em> key is then created (if it doesn&rsquo;t exist already) for the chosen process, and the <em>LastDetectionTime</em> is updated.</p>
+<h2 id="closing-thoughts">Closing Thoughts</h2>
+<p>That&rsquo;s all! I hope you found this short research interesting. This artifact is not all that important, but it was fun to research anyways. If I got something wrong, that&rsquo;s probably because I have no idea what I&rsquo;m doing. I&rsquo;m not super comfortable with IDA and reverse engineering, but I did my best. Let me know what you think!</p>
+]]></content:encoded>
+    </item>
+    
+  </channel>
+</rss>
