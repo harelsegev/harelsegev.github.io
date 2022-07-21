@@ -115,4 +115,4 @@ A sub-key beneath the *DiagnosedApplications* key is then created (if it doesn't
 
 ## Closing Thoughts
 
-That's all! I hope you found this short research interesting. This artifact is not all that important, but it was fun to research anyways. If I got something wrong, that's probably because I have no idea what I'm doing. I'm not super comfortable with IDA and reverse engineering, but I did my best. Let me know what you think!
+That's all! I hope you found this short research interesting. This artifact is not all that powerful, because only the applications that commit a large amount of memory are registered. Nonetheless, it was quite fun to research. I'm not super experienced in using IDA and reverse engineering, but I think I did a decent job. Let me know what you think!

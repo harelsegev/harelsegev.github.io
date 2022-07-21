@@ -91,7 +91,7 @@ It has quite a few sub-keys, and each one has a LastDetectionTime QWORD value, c
 </ul>
 <p>A sub-key beneath the <em>DiagnosedApplications</em> key is then created (if it doesn&rsquo;t exist already) for the chosen process, and the <em>LastDetectionTime</em> is updated.</p>
 <h2 id="closing-thoughts">Closing Thoughts</h2>
-<p>That&rsquo;s all! I hope you found this short research interesting. This artifact is not all that important, but it was fun to research anyways. If I got something wrong, that&rsquo;s probably because I have no idea what I&rsquo;m doing. I&rsquo;m not super comfortable with IDA and reverse engineering, but I did my best. Let me know what you think!</p>
+<p>That&rsquo;s all! I hope you found this short research interesting. This artifact is not all that powerful, because only the applications that commit a large amount of memory are registered. Nonetheless, it was quite fun to research. I&rsquo;m not super experienced in using IDA and reverse engineering, but I think I did a decent job. Let me know what you think!</p>
 ]]></content:encoded>
     </item>
     
