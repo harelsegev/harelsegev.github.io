@@ -83,13 +83,15 @@ It has quite a few sub-keys, and each one has a LastDetectionTime QWORD value, c
 <p><img loading="lazy" src="images/ida32_qsort.png" alt=""  />
 </p>
 <h2 id="answering-my-research-questions">Answering my Research Questions</h2>
-<p>At this point, I had a solid and complete theory, which I have tested and verified:</p>
+<p>At this point, I had a <del>solid and complete</del> theory, which I have tested and verified:</p>
 <p>The Memory Leak Diagnoser is triggered every <em>TimerInverval</em> minutes. When triggered, it gets a list of all running processes, and sorts them by their amount of committed memory (in descending order). Then, it chooses the first process on the list which:</p>
 <ul>
 <li>Has committed at least <em>CommitThreshold</em> percent out of the total amount of physical memory installed.</li>
 <li>Wasn&rsquo;t already chosen in the last <em>DetectionInterval</em> days.</li>
 </ul>
 <p>A sub-key beneath the <em>DiagnosedApplications</em> key is then created (if it doesn&rsquo;t exist already) for the chosen process, and the <em>LastDetectionTime</em> is updated.</p>
+<p><strong>Edit:</strong> some built-in executables are chosen to be diagnosed, but are not registered.<br>
+Why? Further research is needed.</p>
 <h2 id="closing-thoughts">Closing Thoughts</h2>
 <p>That&rsquo;s all! I hope you found this short research interesting. This artifact is not all that powerful, because only the applications that commit a large amount of memory are registered. Nonetheless, it was quite fun to research. I&rsquo;m not super experienced in using IDA and reverse engineering, but I think I did a decent job. Let me know what you think!</p>
 ]]></content:encoded>

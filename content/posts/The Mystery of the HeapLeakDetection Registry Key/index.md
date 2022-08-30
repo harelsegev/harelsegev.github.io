@@ -104,7 +104,7 @@ These structures contain information about the resource usage of each process. L
 
 ## Answering my Research Questions
 
-At this point, I had a solid and complete theory, which I have tested and verified:
+At this point, I had a ~~solid and complete~~ theory, which I have tested and verified:
 
 The Memory Leak Diagnoser is triggered every *TimerInverval* minutes. When triggered, it gets a list of all running processes, and sorts them by their amount of committed memory (in descending order). Then, it chooses the first process on the list which:
 
@@ -112,6 +112,9 @@ The Memory Leak Diagnoser is triggered every *TimerInverval* minutes. When trigg
 * Wasn't already chosen in the last *DetectionInterval* days.
 
 A sub-key beneath the *DiagnosedApplications* key is then created (if it doesn't exist already) for the chosen process, and the *LastDetectionTime* is updated.
+
+**Edit:** some built-in executables are chosen to be diagnosed, but are not registered.  
+Why? Further research is needed.
 
 ## Closing Thoughts
 
