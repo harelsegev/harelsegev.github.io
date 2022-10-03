@@ -2,49 +2,49 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
   xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
-    <loc>http://harelsegev.github.io/posts/</loc>
+    <loc>https://harelsegev.github.io/posts/</loc>
     <lastmod>2022-07-20T00:00:00+00:00</lastmod>
   </url><url>
-    <loc>http://harelsegev.github.io/</loc>
+    <loc>https://harelsegev.github.io/</loc>
     <lastmod>2022-07-20T00:00:00+00:00</lastmod>
   </url><url>
-    <loc>http://harelsegev.github.io/tags/registry/</loc>
+    <loc>https://harelsegev.github.io/tags/registry/</loc>
     <lastmod>2022-07-20T00:00:00+00:00</lastmod>
   </url><url>
-    <loc>http://harelsegev.github.io/tags/reverse-engineering/</loc>
+    <loc>https://harelsegev.github.io/tags/reverse-engineering/</loc>
     <lastmod>2022-07-20T00:00:00+00:00</lastmod>
   </url><url>
-    <loc>http://harelsegev.github.io/tags/</loc>
+    <loc>https://harelsegev.github.io/tags/</loc>
     <lastmod>2022-07-20T00:00:00+00:00</lastmod>
   </url><url>
-    <loc>http://harelsegev.github.io/posts/the-mystery-of-the-heapleakdetection-registry-key/</loc>
+    <loc>https://harelsegev.github.io/posts/the-mystery-of-the-heapleakdetection-registry-key/</loc>
     <lastmod>2022-07-20T00:00:00+00:00</lastmod>
   </url><url>
-    <loc>http://harelsegev.github.io/tags/mft/</loc>
+    <loc>https://harelsegev.github.io/tags/mft/</loc>
     <lastmod>2022-07-07T00:00:00+00:00</lastmod>
   </url><url>
-    <loc>http://harelsegev.github.io/tags/ntfs/</loc>
+    <loc>https://harelsegev.github.io/tags/ntfs/</loc>
     <lastmod>2022-07-07T00:00:00+00:00</lastmod>
   </url><url>
-    <loc>http://harelsegev.github.io/posts/resolving-file-paths-using-the-mft/</loc>
+    <loc>https://harelsegev.github.io/posts/resolving-file-paths-using-the-mft/</loc>
     <lastmod>2022-07-07T00:00:00+00:00</lastmod>
   </url><url>
-    <loc>http://harelsegev.github.io/tags/i30/</loc>
+    <loc>https://harelsegev.github.io/tags/i30/</loc>
     <lastmod>2022-07-02T00:00:00+00:00</lastmod>
   </url><url>
-    <loc>http://harelsegev.github.io/posts/home-adventures/home-adventures-a-prefetch-file-in-i30-slack-pyinstaller-prefetch-hash-cracking/</loc>
+    <loc>https://harelsegev.github.io/posts/home-adventures/home-adventures-a-prefetch-file-in-i30-slack-pyinstaller-prefetch-hash-cracking/</loc>
     <lastmod>2022-07-02T00:00:00+00:00</lastmod>
   </url><url>
-    <loc>http://harelsegev.github.io/tags/prefetch/</loc>
+    <loc>https://harelsegev.github.io/tags/prefetch/</loc>
     <lastmod>2022-07-02T00:00:00+00:00</lastmod>
   </url><url>
-    <loc>http://harelsegev.github.io/tags/pyinstaller/</loc>
+    <loc>https://harelsegev.github.io/tags/pyinstaller/</loc>
     <lastmod>2022-07-02T00:00:00+00:00</lastmod>
   </url><url>
-    <loc>http://harelsegev.github.io/archives/</loc>
+    <loc>https://harelsegev.github.io/archives/</loc>
   </url><url>
-    <loc>http://harelsegev.github.io/categories/</loc>
+    <loc>https://harelsegev.github.io/categories/</loc>
   </url><url>
-    <loc>http://harelsegev.github.io/search/</loc>
+    <loc>https://harelsegev.github.io/search/</loc>
   </url>
 </urlset>

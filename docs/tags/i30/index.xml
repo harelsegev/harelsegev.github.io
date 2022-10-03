@@ -2,16 +2,16 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
   <channel>
     <title>$I30 on RAT In Mi Kitchen</title>
-    <link>http://harelsegev.github.io/tags/i30/</link>
+    <link>https://harelsegev.github.io/tags/i30/</link>
     <description>Recent content in $I30 on RAT In Mi Kitchen</description>
     <generator>Hugo -- gohugo.io</generator>
-    <lastBuildDate>Sat, 02 Jul 2022 00:00:00 +0000</lastBuildDate><atom:link href="http://harelsegev.github.io/tags/i30/index.xml" rel="self" type="application/rss+xml" />
+    <lastBuildDate>Sat, 02 Jul 2022 00:00:00 +0000</lastBuildDate><atom:link href="https://harelsegev.github.io/tags/i30/index.xml" rel="self" type="application/rss+xml" />
     <item>
       <title>Home Adventures! A Prefetch File in $I30 Slack, PyInstaller &amp; Prefetch Hash Cracking</title>
-      <link>http://harelsegev.github.io/posts/home-adventures/home-adventures-a-prefetch-file-in-i30-slack-pyinstaller-prefetch-hash-cracking/</link>
+      <link>https://harelsegev.github.io/posts/home-adventures/home-adventures-a-prefetch-file-in-i30-slack-pyinstaller-prefetch-hash-cracking/</link>
       <pubDate>Sat, 02 Jul 2022 00:00:00 +0000</pubDate>
       
-      <guid>http://harelsegev.github.io/posts/home-adventures/home-adventures-a-prefetch-file-in-i30-slack-pyinstaller-prefetch-hash-cracking/</guid>
+      <guid>https://harelsegev.github.io/posts/home-adventures/home-adventures-a-prefetch-file-in-i30-slack-pyinstaller-prefetch-hash-cracking/</guid>
       <description>I often test my tools on my old computer at home. It&amp;rsquo;s so much more interesting to investigate than a newly created virtual machine. Today, while testing, I found evidence of activity from almost 2 years ago. It got me really excited, and I thought it would make a cool blog post!
 Here&amp;rsquo;s a snippet from the timeline I created using MFTECmd and INDXRipper:
 A Prefetch File in $I30 Slack The Prefetch file FLOSS64.</description>

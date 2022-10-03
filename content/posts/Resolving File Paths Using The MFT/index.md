@@ -1,5 +1,5 @@
 ---
-title: "Resolving File Paths Using The MFT"
+title: "Resolving File Paths Using the MFT"
 date: "2022-07-07"
 author: "Harel Segev"
 tags: ["NTFS", "MFT"]

@@ -1,4 +1,4 @@
-baseURL: "http://harelsegev.github.io/"
+baseURL: "https://harelsegev.github.io/"
 title: "RAT In Mi Kitchen"
 paginate: 5
 theme: "PaperMod"
