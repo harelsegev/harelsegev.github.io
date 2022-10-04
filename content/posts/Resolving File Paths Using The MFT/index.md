@@ -96,9 +96,11 @@ def build_path(mft, current_record):
 
 Of course, we could have used caching to improve the efficiency - but for the sake of simplicity, all of the code in this post will be pretty inefficient. In the next sections, we'll see how deleted files, hard links and extension records break everything, and we'll change our code to deal with them.
 
-## Pitfall 1: Orphan Files & The Sequence Number
+## Pitfall 1: Orphan Files & the Sequence Number
 
 The first edge case we'll discuss involves deleted files. When a file is deleted, its MFT record is marked as free. Then, it can be reused if a new file is created - why add a new record to the MFT when there's a free, existing one? If there are multiple free records, and a new file is created - it may occupy either one of them.
+
+We can tell whether a record is in use by looking at the `Flags` field in the record header, and more specifically - at its least significant bit, which is the flag representing the state of the record. When a record is allocated to a file, it is set. When that file is deleted, it is turned off.
 
 ### Orphan Files
 

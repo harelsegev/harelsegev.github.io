@@ -141,8 +141,9 @@ An index to the MFT record of the file&rsquo;s parent folder.</p>
 </span></span><span style="display:flex;"><span>        
 </span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">return</span> <span style="color:#e6db74">&#34;.&#34;</span> <span style="color:#f92672">+</span> path
 </span></span></code></pre></div><p>Of course, we could have used caching to improve the efficiency - but for the sake of simplicity, all of the code in this post will be pretty inefficient. In the next sections, we&rsquo;ll see how deleted files, hard links and extension records break everything, and we&rsquo;ll change our code to deal with them.</p>
-<h2 id="pitfall-1-orphan-files--the-sequence-number">Pitfall 1: Orphan Files &amp; The Sequence Number</h2>
+<h2 id="pitfall-1-orphan-files--the-sequence-number">Pitfall 1: Orphan Files &amp; the Sequence Number</h2>
 <p>The first edge case we&rsquo;ll discuss involves deleted files. When a file is deleted, its MFT record is marked as free. Then, it can be reused if a new file is created - why add a new record to the MFT when there&rsquo;s a free, existing one? If there are multiple free records, and a new file is created - it may occupy either one of them.</p>
+<p>We can tell whether a record is in use by looking at the <code>Flags</code> field in the record header, and more specifically - at its least significant bit, which is the flag representing the state of the record. When a record is allocated to a file, it is set. When that file is deleted, it is turned off.</p>
 <h3 id="orphan-files">Orphan Files</h3>
 <p>As long as the record of a deleted file is not reused - it remains intact, which means we can resolve the file&rsquo;s path just like any other file. Problems may arise if the file&rsquo;s parent folder is deleted as well. Let&rsquo;s see what happens when the parent folder&rsquo;s record is reused, while the child&rsquo;s record remains free:</p>
 <ol>
