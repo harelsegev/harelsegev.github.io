@@ -24,11 +24,11 @@ Because they have their own sub-key, a change in the settings does not affect th
 
 The big question is - can we use this timestamp to determine the first time a user executed WScript or CScript? Well, maybe. It depends on whether values or sub-keys *other* than Settings are ever created beneath the WSH key.
 
-I've done some testing, and I couldn't get either WScript or CScript to create ,or even query other values or sub-keys. This makes me believe it *never* happens. I cannot be entirely sure, but I'm at least somewhat confident.
+I've done some testing, and I couldn't get either WScript or CScript to create ,or even query other values or sub-keys. This makes me believe it *never* happens. I cannot be entirely sure, but I'm somewhat confident.
 
 ![](images/wscript_procmon.png)
 
-If I'm right - then the last write time of the WSH key **always** indicates its creation time, and I can see all sorts of exciting things we can use it for:
+If I'm right - then the last write time of the WSH key **always** indicates its creation time, and I can see all sorts of exciting things we can use this for:
 
 * Determine the first time a user executed WScript or CScript. If WSH isn't typically used in your environment, this may be worth hunting for.
 

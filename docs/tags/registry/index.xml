@@ -25,10 +25,10 @@ Typically, an attacker will drop a malicious script on disk - a .vbs, .js or a .
 <p>Interestingly, the WSH key in NTUSER.DAT does not exist by default. It is only created when the user executes WScript or CScript for the first time.</p>
 <p>Because they have their own sub-key, a change in the settings does not affect the last write timestamp of the WSH key. Therefore, it won&rsquo;t usually change after the key is created, even if the settings are changed.</p>
 <p>The big question is - can we use this timestamp to determine the first time a user executed WScript or CScript? Well, maybe. It depends on whether values or sub-keys <em>other</em> than Settings are ever created beneath the WSH key.</p>
-<p>I&rsquo;ve done some testing, and I couldn&rsquo;t get either WScript or CScript to create ,or even query other values or sub-keys. This makes me believe it <em>never</em> happens. I cannot be entirely sure, but I&rsquo;m at least somewhat confident.</p>
+<p>I&rsquo;ve done some testing, and I couldn&rsquo;t get either WScript or CScript to create ,or even query other values or sub-keys. This makes me believe it <em>never</em> happens. I cannot be entirely sure, but I&rsquo;m somewhat confident.</p>
 <p><img loading="lazy" src="images/wscript_procmon.png" alt=""  />
 </p>
-<p>If I&rsquo;m right - then the last write time of the WSH key <strong>always</strong> indicates its creation time, and I can see all sorts of exciting things we can use it for:</p>
+<p>If I&rsquo;m right - then the last write time of the WSH key <strong>always</strong> indicates its creation time, and I can see all sorts of exciting things we can use this for:</p>
 <ul>
 <li>Determine the first time a user executed WScript or CScript. If WSH isn&rsquo;t typically used in your environment, this may be worth hunting for.</li>
 </ul>
