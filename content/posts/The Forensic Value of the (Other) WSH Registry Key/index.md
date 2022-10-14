@@ -20,11 +20,11 @@ This post is not about *this* key, though. It's about a matching Windows Script 
 
 Interestingly, the WSH key in NTUSER.DAT does not exist by default. It is only created when the user executes WScript or CScript for the first time.
 
-Because they have their own sub-key, a change in the settings does not affect the last write timestamp of the WSH key. Therefore, it won't usually change after the key is created, even if the settings are changed.
+Because they have their own sub-key, a change in the settings does not affect the last write timestamp of the WSH key. It won't usually change after the key is created, even if the settings are changed.
 
 The big question is - can we use this timestamp to determine the first time a user executed WScript or CScript? Well, maybe. It depends on whether values or sub-keys *other* than Settings are ever created beneath the WSH key.
 
-I've done some testing, and I couldn't get either WScript or CScript to create ,or even query other values or sub-keys. This makes me believe it *never* happens. I cannot be entirely sure, but I'm somewhat confident.
+I've done some testing, and I couldn't get either WScript or CScript to create (or even query) other values or sub-keys. I believe it *never* happens. I cannot be entirely sure, but I'm somewhat confident.
 
 ![](images/wscript_procmon.png)
 
