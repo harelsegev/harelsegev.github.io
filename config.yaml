@@ -4,14 +4,16 @@ paginate: 5
 theme: "PaperMod"
 publishDir: "docs"
 
+enableRobotsTXT: true
+
 params:
+  env: production
   title: "RAT In Mi Kitchen"
   keywords: ["Blog", "DFIR"]
   DateFormat: "January 2, 2006"
   author: "Harel Segev"
   defaultTheme: dark
   disableThemeToggle: false
-
   ShowReadingTime: true
   ShowShareButtons: true
   ShowPostNavLinks: true
@@ -37,27 +39,33 @@ params:
   socialIcons:
     - name: github
       url: "https://github.com/harelsegev"
+    - name: twitter
+      url: "https://twitter.com/harelsegev"
     - name: rss
       url: "https://harelsegev.github.io/index.xml"
 
 menu:
   main:
     - identifier: posts
-      name: posts
-      url: /posts/
+      name: Posts
+      url: posts/
       weight: 10
     - identifier: tags
-      name: tags
-      url: /tags/
+      name: Tags
+      url: tags/
       weight: 20
-    - identifier: search
-      name: search
-      url: /search/
+    - identifier: categories
+      name: Categories
+      url: categories/
       weight: 30
-    - identifier: archives
-      name: archive
-      url: /archives/
+    - identifier: search
+      name: Search
+      url: search/
       weight: 40
+    - identifier: archives
+      name: Archive
+      url: archives/
+      weight: 50
 
 outputs:
   home:

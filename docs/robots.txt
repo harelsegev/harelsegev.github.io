@@ -1,0 +1,3 @@
+User-agent: *
+Disallow:
+Sitemap: https://harelsegev.github.io/sitemap.xml

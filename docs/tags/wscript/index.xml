@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>WScript on RAT In Mi Kitchen</title>
+    <link>https://harelsegev.github.io/tags/wscript/</link>
+    <description>Recent content in WScript on RAT In Mi Kitchen</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <lastBuildDate>Thu, 13 Oct 2022 00:00:00 +0000</lastBuildDate><atom:link href="https://harelsegev.github.io/tags/wscript/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>The Forensic Value of the (Other) WSH Registry Key</title>
+      <link>https://harelsegev.github.io/posts/the-forensic-value-of-the-other-wsh-registry-key/</link>
+      <pubDate>Thu, 13 Oct 2022 00:00:00 +0000</pubDate>
+      
+      <guid>https://harelsegev.github.io/posts/the-forensic-value-of-the-other-wsh-registry-key/</guid>
+      <description>WSH (Windows Script Host) is an automation tool built into Windows, providing powerful scripting abilities. It was introduced in Windows 98, long predating .NET and PowerShell. Whilst being largely abandoned by system administrators, It is sometimes used by attackers to evade detection and obfuscate their infection chains.
+Typically, an attacker will drop a malicious script on disk - a .vbs, .js or a .wsf file, and then execute it using either the WScript or the CScript host.</description>
+      <content:encoded><![CDATA[<p><em>WSH</em> (Windows Script Host) is an automation tool built into Windows, providing powerful scripting abilities. It was introduced in Windows 98, long predating .NET and PowerShell. Whilst being largely abandoned by system administrators, It is sometimes used by attackers to evade detection and obfuscate their infection chains.</p>
+<p>Typically, an attacker will drop a malicious script on disk - a <code>.vbs</code>, <code>.js</code> or a <code>.wsf</code> file, and then execute it using either the WScript or the CScript host.</p>
+<p>System-wide WSH settings are stored in the SOFTWARE hive, in the Windows Script Host key, and can be examined using the <code>wsh_settings</code> RegRipper plugin:</p>
+<p><img loading="lazy" src="images/wsh_settings_hklm.png" alt=""  />
+</p>
+<p>This post is not about <em>this</em> key, though. It&rsquo;s about a matching Windows Script Host key in the NTUSER.DAT hive, which stores the user-specific WSH settings:</p>
+<p><img loading="lazy" src="images/wsh_settings_hkcu.png" alt=""  />
+</p>
+<p>Interestingly, the WSH key in NTUSER.DAT does not exist by default. It is only created when the user executes WScript or CScript for the first time.</p>
+<p>Because they have their own sub-key, a change in the settings does not affect the last write timestamp of the WSH key. It won&rsquo;t usually change after the key is created, even if the settings are changed.</p>
+<p>The big question is - can we use this timestamp to determine the first time a user executed WScript or CScript? Well, maybe. It depends on whether values or sub-keys <em>other</em> than Settings are ever created beneath the WSH key.</p>
+<p>I&rsquo;ve done some testing, and I couldn&rsquo;t get either WScript or CScript to create (or even query) other values or sub-keys. I believe it <em>never</em> happens. I cannot be entirely sure, but I&rsquo;m somewhat confident.</p>
+<p><img loading="lazy" src="images/wscript_procmon.png" alt=""  />
+</p>
+<p>If I&rsquo;m right - then the last write time of the WSH key <strong>always</strong> indicates its creation time, and I can see all sorts of exciting things we can use this for:</p>
+<ul>
+<li>Determine the first time a user executed WScript or CScript. If WSH isn&rsquo;t typically used in your environment, this may be worth hunting for.</li>
+</ul>
+<p><!-- raw HTML omitted --><!-- raw HTML omitted --></p>
+<ul>
+<li>Attribute the execution of a WSH script to a specific user account. If a <code>.js</code> script were dropped on disk, and a user&rsquo;s WSH key were then immediately created, I&rsquo;d bet that user executed the script.</li>
+</ul>
+<blockquote>
+<p><strong>Note:</strong> If WScript or CScript is executed with SYSTEM privileges, the Windows Script Host key will be created in the DEFAULT hive.</p>
+</blockquote>
+]]></content:encoded>
+    </item>
+    
+  </channel>
+</rss>

@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <meta name="robots" content="index, follow">
 <title>The Mystery of the HeapLeakDetection Registry Key | RAT In Mi Kitchen</title>
-<meta name="keywords" content="Registry, Reverse Engineering">
+<meta name="keywords" content="Registry, HeapLeakDetection">
 <meta name="description" content="I was working on a case the other day, when I first came across a rather interesting registry key, HKLM\Software\Microsoft\RADAR\HeapLeakDetection\DiagnosedApplications. It caught my eye, because it has sub-keys for (what appears to be) applications executed on the system. This is what it looks like on my own system:
 It has quite a few sub-keys, and each one has a LastDetectionTime QWORD value, containing what appears to be a Windows FILETIME timestamp:">
 <meta name="author" content="Harel Segev">
@@ -71,7 +71,7 @@ It has quite a few sub-keys, and each one has a LastDetectionTime QWORD value, c
   "name": "The Mystery of the HeapLeakDetection Registry Key",
   "description": "I was working on a case the other day, when I first came across a rather interesting registry key, HKLM\\Software\\Microsoft\\RADAR\\HeapLeakDetection\\DiagnosedApplications. It caught my eye, because it has sub-keys for (what appears to be) applications executed on the system. This is what it looks like on my own system:\nIt has quite a few sub-keys, and each one has a LastDetectionTime QWORD value, containing what appears to be a Windows FILETIME timestamp:",
   "keywords": [
-    "Registry", "Reverse Engineering"
+    "Registry", "HeapLeakDetection"
   ],
   "articleBody": "I was working on a case the other day, when I first came across a rather interesting registry key, HKLM\\Software\\Microsoft\\RADAR\\HeapLeakDetection\\DiagnosedApplications. It caught my eye, because it has sub-keys for (what appears to be) applications executed on the system. This is what it looks like on my own system:\nIt has quite a few sub-keys, and each one has a LastDetectionTime QWORD value, containing what appears to be a Windows FILETIME timestamp:\nThis key is associated with the Memory Leak Diagnoser component of Windows Resource Exhaustion Detection and Resolution (RADAR). RADAR is a technology embedded in Windows to detect memory leaks in real-time, so that data can be collected and used to correct issues in applications.\nRADAR is surprisingly old; it was introduced in Windows Vista. Nevertheless, I couldn’t find any research into this registry key - so I had to conduct my own. With forensics in mind, I tried to answer these 2 questions:\nUnder what conditions is a sub-key created beneath the DiagnosedApplications key? Under what conditions is the LastDetectionTime value updated? My research was conducted on Windows 10 machines, and therefore may not apply to prior versions of Windows.\nLooking at the Settings Luckily, there’s a Settings key beneath the HeapLeakDetection key:\nSettings are always helpful when you’re trying to figure out how something works. Looking at these values, I already had some hypotheses. I figured whether an application is diagnosed has something to do with the amount of memory it allocated.\nI had a guess that CommitFloor and CommitCeiling are actually in megabytes, and that the amount of committed memory has to lie between them for a process to be registered. That lead me to write a little C program, to test this theory:\n#include #include int main() { // set nAllocatedSize to be between CommitFloor and CommitCeiling size_t nAllocatedSize = 1024 * 1024 * 250; if(VirtualAlloc(NULL, nAllocatedSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE)) { printf(\"Committed 250 MB of memory\\n\"); while(1) { printf(\"Sleeping...\\n\"); Sleep(5000); } } } I executed the binary on 2 of my machines, and the results threw me off completely. On one of them, it was registered after a few minutes - but on the other one it wasn’t registered at all. They’re both running the same Windows 10 version, so what’s going on?\nReverse Engineering RdrpReadHeapLeakSettings To figure this out, I needed more information. Using Procmon, I was able to pinpoint the DLL which manages the DiagnosedApplications registry key:\nI figured I should start my analysis in the RdrpReadHeapLeakSettings function. I hoped it would help me understand the settings better. Take DetectionInterval, for example; it’s 0x1E, or 30 decimal - but 30 what? seconds? minutes? I had no idea.\nThis turned out to be a great idea, because the function transforms each value in a way that enabled me to understand what it means. For example, the DetectionInterval value is multiplied by 86400 after it is read from the registry. 86400 happens to be 60 * 60 * 24. This means DetectionInterval is stored days, and is converted to seconds:\nIn a similar fashion, I was able to conclude that TimerInterval is stored in minutes.\nDetectionInterval is stored in a global variable after it’s converted to seconds - to make it available for other functions to use. This is also the case for CommitThreshold, MaxReports and TimerInterval. However, both CommitFloor and CommitCeiling aren’t stored anywhere after they’re read. I doubt whether they’re actually used at all!\nThe next value I looked at is CommitThreshold, which seems to be 5 by default. After it is read from the registry, the function checks if it’s between 1 to 100:\nAfter that, there’s a call to NtQuerySystemInformation to get a SystemBasicInformation struct. Unfortunately, the structure of this struct is not documented on MSDN:\nNevertheless, I found documentation for it on some other, rather questionable website. Then, I was able to define it as a struct in IDA Pro. What I found then, was the explanation to the confusing results of my test:\nCommitThreshold is multiplied by (PageSize * NumberOfPhysicalPages) / 100. That lead me to conclude it’s the amount of memory an application has to commit in order to get diagnosed, as a percentage of the total amount of physical memory on the system.\nI was able to verify this theory through further testing. This artifact behaves differently depending on the amount of RAM installed in the machine.\nThe 250MBs my test application allocated are more than 5 percent out of the 4GBs of RAM installed in the first machine I tested on, but they’re less than 5 percent out of the 8GBs installed in my other machine.\nLooking at RdrpIdentifyTargetProcess What happens if the Memory Leak Diagnoser is triggered, and there are multiple processes with a high enough amount of committed memory to be diagnosed? Well, only one of them is chosen to be registered. I wanted to figure out how this choice is made, so the next function I looked at was RdrpIdentifyTargetProcess.\nFirst, it calls RdrpGetProcessInformation, which in turn uses the NtQuerySystemInformation API call; this time - to get an array of SYSTEM_PROCESS_INFORMATION structures, one for each running process:\nThese structures contain information about the resource usage of each process. Later, it seems like this array is sorted by the amount of committed memory in each process:\nAnswering my Research Questions At this point, I had a solid and complete theory, which I have tested and verified:\nThe Memory Leak Diagnoser is triggered every TimerInverval minutes. When triggered, it gets a list of all running processes, and sorts them by their amount of committed memory (in descending order). Then, it chooses the first process on the list which:\nHas committed at least CommitThreshold percent out of the total amount of physical memory installed. Wasn’t already chosen in the last DetectionInterval days. A sub-key beneath the DiagnosedApplications key is then created (if it doesn’t exist already) for the chosen process, and the LastDetectionTime is updated.\nEdit: some built-in executables are chosen to be diagnosed, but are not registered.\nWhy? Further research is needed.\nClosing Thoughts That’s all! I hope you found this short research interesting. This artifact is not all that powerful, because only the applications that commit a large amount of memory are registered. Nonetheless, it was quite fun to research. I’m not super experienced in using IDA and reverse engineering, but I think I did a decent job. Let me know what you think!\n",
   "wordCount" : "1070",
@@ -135,23 +135,28 @@ It has quite a few sub-keys, and each one has a LastDetectionTime QWORD value, c
         </div>
         <ul id="menu">
             <li>
-                <a href="https://harelsegev.github.io/posts/" title="posts">
-                    <span>posts</span>
+                <a href="https://harelsegev.github.io/posts/" title="Posts">
+                    <span>Posts</span>
                 </a>
             </li>
             <li>
-                <a href="https://harelsegev.github.io/tags/" title="tags">
-                    <span>tags</span>
+                <a href="https://harelsegev.github.io/tags/" title="Tags">
+                    <span>Tags</span>
                 </a>
             </li>
             <li>
-                <a href="https://harelsegev.github.io/search/" title="search (Alt &#43; /)" accesskey=/>
-                    <span>search</span>
+                <a href="https://harelsegev.github.io/categories/" title="Categories">
+                    <span>Categories</span>
                 </a>
             </li>
             <li>
-                <a href="https://harelsegev.github.io/archives/" title="archive">
-                    <span>archive</span>
+                <a href="https://harelsegev.github.io/search/" title="Search (Alt &#43; /)" accesskey=/>
+                    <span>Search</span>
+                </a>
+            </li>
+            <li>
+                <a href="https://harelsegev.github.io/archives/" title="Archive">
+                    <span>Archive</span>
                 </a>
             </li>
         </ul>
@@ -274,7 +279,7 @@ Why? Further research is needed.</p>
   <footer class="post-footer">
     <ul class="post-tags">
       <li><a href="https://harelsegev.github.io/tags/registry/">Registry</a></li>
-      <li><a href="https://harelsegev.github.io/tags/reverse-engineering/">Reverse Engineering</a></li>
+      <li><a href="https://harelsegev.github.io/tags/heapleakdetection/">HeapLeakDetection</a></li>
     </ul>
 <nav class="paginav">
   <a class="prev" href="https://harelsegev.github.io/posts/the-forensic-value-of-the-other-wsh-registry-key/">
@@ -292,7 +297,7 @@ Why? Further research is needed.</p>
 
 <div class="share-buttons">
     <a target="_blank" rel="noopener noreferrer" aria-label="share The Mystery of the HeapLeakDetection Registry Key on twitter"
-        href="https://twitter.com/intent/tweet/?text=The%20Mystery%20of%20the%20HeapLeakDetection%20Registry%20Key&amp;url=https%3a%2f%2fharelsegev.github.io%2fposts%2fthe-mystery-of-the-heapleakdetection-registry-key%2f&amp;hashtags=Registry%2cReverseEngineering">
+        href="https://twitter.com/intent/tweet/?text=The%20Mystery%20of%20the%20HeapLeakDetection%20Registry%20Key&amp;url=https%3a%2f%2fharelsegev.github.io%2fposts%2fthe-mystery-of-the-heapleakdetection-registry-key%2f&amp;hashtags=Registry%2cHeapLeakDetection">
         <svg version="1.1" viewBox="0 0 512 512" xml:space="preserve">
             <path
                 d="M449.446,0c34.525,0 62.554,28.03 62.554,62.554l0,386.892c0,34.524 -28.03,62.554 -62.554,62.554l-386.892,0c-34.524,0 -62.554,-28.03 -62.554,-62.554l0,-386.892c0,-34.524 28.029,-62.554 62.554,-62.554l386.892,0Zm-253.927,424.544c135.939,0 210.268,-112.643 210.268,-210.268c0,-3.218 0,-6.437 -0.153,-9.502c14.406,-10.421 26.973,-23.448 36.935,-38.314c-13.18,5.824 -27.433,9.809 -42.452,11.648c15.326,-9.196 26.973,-23.602 32.49,-40.92c-14.252,8.429 -30.038,14.56 -46.896,17.931c-13.487,-14.406 -32.644,-23.295 -53.946,-23.295c-40.767,0 -73.87,33.104 -73.87,73.87c0,5.824 0.613,11.494 1.992,16.858c-61.456,-3.065 -115.862,-32.49 -152.337,-77.241c-6.284,10.881 -9.962,23.601 -9.962,37.088c0,25.594 13.027,48.276 32.95,61.456c-12.107,-0.307 -23.448,-3.678 -33.41,-9.196l0,0.92c0,35.862 25.441,65.594 59.311,72.49c-6.13,1.686 -12.72,2.606 -19.464,2.606c-4.751,0 -9.348,-0.46 -13.946,-1.38c9.349,29.426 36.628,50.728 68.965,51.341c-25.287,19.771 -57.164,31.571 -91.8,31.571c-5.977,0 -11.801,-0.306 -17.625,-1.073c32.337,21.15 71.264,33.41 112.95,33.41Z" />

@@ -2,7 +2,8 @@
 title: "The Mystery of the HeapLeakDetection Registry Key"
 date: "2022-07-20"
 author: "Harel Segev"
-tags: ["Registry", "Reverse Engineering"]
+tags: ["Registry", "HeapLeakDetection"]
+categories: ["Artifacts", "Reverse Engineering"]
 draft: false
 ---
 
