@@ -5,7 +5,131 @@
     <link>https://harelsegev.github.io/</link>
     <description>Recent content on RAT In Mi Kitchen</description>
     <generator>Hugo -- gohugo.io</generator>
-    <lastBuildDate>Thu, 13 Oct 2022 00:00:00 +0000</lastBuildDate><atom:link href="https://harelsegev.github.io/index.xml" rel="self" type="application/rss+xml" />
+    <lastBuildDate>Sat, 29 Oct 2022 00:00:00 +0000</lastBuildDate><atom:link href="https://harelsegev.github.io/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>$I30 Parsers Output False Entries. Here&#39;s Why</title>
+      <link>https://harelsegev.github.io/posts/i30-parsers-output-false-entries.-heres-why/</link>
+      <pubDate>Sat, 29 Oct 2022 00:00:00 +0000</pubDate>
+      
+      <guid>https://harelsegev.github.io/posts/i30-parsers-output-false-entries.-heres-why/</guid>
+      <description>In the README page of my tool, INDXRipper (Go check it out! It&amp;rsquo;s really cool), down in the &amp;ldquo;Limitations&amp;rdquo; section, I gave some warnings regarding the reliability of the tool:
+The tool may give false results. While false positives are rare, they are possible.
+Partially overwritten entries may not be found. If they are found, though, the tool may give you false information.
+These shortcomings apply to every $I30 parser, and in this post - I&amp;rsquo;ll explain why.</description>
+      <content:encoded><![CDATA[<p>In the README page of my tool, <a href="https://github.com/harelsegev/INDXRipper">INDXRipper</a> (Go check it out! It&rsquo;s really cool), down in the &ldquo;Limitations&rdquo; section, I gave some warnings regarding the reliability of the tool:</p>
+<blockquote>
+<p>The tool may give false results. While false positives are rare, they are possible.</p>
+</blockquote>
+<blockquote>
+<p>Partially overwritten entries may not be found. If they are found, though, the tool may give you false information.</p>
+</blockquote>
+<p>These shortcomings apply to <em>every</em> $I30 parser, and in this post - I&rsquo;ll explain why. First, I will give an overview of directories in NTFS, and talk a bit about how $I30 parsers work. Then, I&rsquo;ll show you a case where a $I30 parser outputs a false entry, and explain how I try to avoid them in INDXRipper.</p>
+<h2 id="ntfs-directories">NTFS Directories</h2>
+<p>In NTFS, a directory is ultimately a collection of entries - one (or more) for every file it contains. Those entries live in a sorted data structure called a B-tree, to allow fast access to files. B-trees are similar to binary search trees, except they are not binary - a node can have more than 2 child-nodes:</p>
+<p><img loading="lazy" src="images/b_tree.svg" alt=""  />
+</p>
+<p>As you can see, each node can store multiple entries. The nodes are laid out sequentially inside an index attribute (<code>$INDEX_ROOT</code> or <code>$INDEX_ALLOCATION</code>), so a $I30 parser can iterate over them without having to deal with the tree structure.</p>
+<p>Inside each node, the entries are sorted by filename. As the following diagram illustrates, they can have different sizes - so each entry has a 2-byte field containing the relative offset of the next entry:</p>
+<p><img loading="lazy" src="images/i30_before_deletion.svg" alt=""  />
+</p>
+<p>When a file is moved in or out of a directory, an entry is created or removed from the tree, respectively. This sometimes causes the tree to rebalance itself - which may cause other, non-related entries to be removed from their node and re-created in another node.</p>
+<p>Let&rsquo;s see what happens if entry <em><strong>B</strong></em> is removed from the above 4-entry node:</p>
+<p><img loading="lazy" src="images/i30_after_deletion.svg" alt=""  />
+</p>
+<p>Entries <em><strong>C</strong></em> and <em><strong>D</strong></em> were simply shifted left. Now, this node contains <em>slack space</em> - space at the end of the node that isn&rsquo;t used by either one of the entries, and is marked here with red diagonal stripes. As you can see, it contains a complete copy of entry <em><strong>D</strong></em> and a partially overwritten copy of entry <em><strong>C</strong></em> from before they were shifted.</p>
+<p>These diagrams showcase some of the unique qualities of this artifact:</p>
+<ul>
+<li>Not every removed entry will have remnants in slack space (Entry <em><strong>B</strong></em>)</li>
+<li>Entries that were <strong>not</strong> removed may have remnants in slack space (Entry <em><strong>C</strong></em> and <em><strong>D</strong></em>)</li>
+<li>Entries in slack space may be partially overwritten (Entry <em><strong>C</strong></em>)</li>
+</ul>
+<h2 id="carving-entries-from-i30-slack-space">Carving Entries From $I30 Slack Space</h2>
+<p>As we have just seen, the content of $I30 slack space is unpredictable. To recover file metadata from it, $I30 parsers utilize techniques that are very similar to file carving.</p>
+<p>File carvers often rely on file signatures to detect files in unallocated space. Unfortunately, $I30 entries don&rsquo;t have a standard header or a fixed signature they can be detected with. However, the file metadata they contain can itself be used to build carving rules.</p>
+<p>Most $I30 parsers base their carving rules on the set of MACB timestamps that $I30 entries contain. A sequence of 4 timestamps makes an really good carving rule, because timestamps only make sense within a very small range of values.</p>
+<p>A Windows FILETIME timestamp has a range of +/- 29,227 years from its epoch of 1601. If you find a sequence of 4 values that are all within a reasonable range when interpreted as timestamps (say, 1990 - 2030), that&rsquo;s probably not a coincidence.</p>
+<h2 id="false-entries">False Entries</h2>
+<p>Sometimes it <strong>is</strong> a coincidence, though. Here&rsquo;s a snippet from a really weird output I got from <a href="https://github.com/williballenthin/INDXParse">INDXParse</a> when I executed it on the index attribute of a directory on my system:</p>
+<p><img loading="lazy" src="images/indxparse_output.png" alt=""  />
+</p>
+<p>The file in the first line looks normal. The last two lines, however - are messed up:</p>
+<ul>
+<li>The second line is almost completely empty, except an unprintable character and a lowercase O in the filename field.</li>
+</ul>
+<p><!-- raw HTML omitted --><!-- raw HTML omitted --></p>
+<ul>
+<li>The file in the third line has a physical size of roughly 118 <strong>Petabytes</strong>, which is a <em>tiny</em> bit more than my hard drive&rsquo;s storage capacity. Its name looks cut-off, and a creation time of 2015 is odd, considering all the other files in that directory were created much later.</li>
+</ul>
+<p>The entry this data was pulled from is partially overwritten - which might explain this output. Let&rsquo;s take a look at this entry in hex, and try to figure out what&rsquo;s going on:</p>
+<p><img loading="lazy" src="images/slack_entry_fragment.png" alt=""  />
+</p>
+<p>What&rsquo;s marked in yellow is a special entry indicating the end of a node. Everything below it is in slack space - including the entry we&rsquo;re interested in. Although it&rsquo;s partially overwritten, the file metadata inside our entry is still intact:</p>
+<ul>
+<li>The filename is marked in blue.</li>
+<li>The 4 MACB timestamps are marked in green.</li>
+<li>The file&rsquo;s physical size is marked in brown.</li>
+<li>The red byte is the filename length in characters.</li>
+</ul>
+<p>What&rsquo;s marked in purple is the <em>file reference</em> of the parent directory. It&rsquo;s composed of the directory&rsquo;s MFT entry number (first 6 bytes) and a sequence number (last 2 bytes).</p>
+<p>All of this file metadata is completely valid. This is the output we would have got if this entry were parsed correctly:</p>
+<table>
+<thead>
+<tr>
+<th>Filename</th>
+<th>Physical Size</th>
+<th>Logical Size</th>
+<th>Creation Time</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>AlarmsAppList.targetsize-16_contrast-black.png</code></td>
+<td>4096</td>
+<td>243</td>
+<td>06/03/2020</td>
+</tr>
+</tbody>
+</table>
+<p>INDXParse should have detected the set of 4 MACB timestamps, and should have given us this output. What went wrong? Well&hellip; everything.</p>
+<p>By pure chance, the file reference of the parent directory is also a reasonable timestamp:</p>
+<p><img loading="lazy" src="images/timestamp.png" alt=""  />
+</p>
+<p>Looks familiar? It&rsquo;s the weird creation time from the third output line! INDXParse detected this file reference as a <strong>timestamp</strong>. The fields that come after it are the <em>actual</em> timestamps, so that lead to the detection of a wrong set of 4 timestamps:</p>
+<p><img loading="lazy" src="images/false_entry.png" alt=""  />
+</p>
+<p>This - my friends, is a false entry. It overlaps with our real entry - which makes this a bit confusing. The fields marked <em>here</em> belong to the false entry. Looking at them, it becomes clear that INDXParse detected this false entry instead of the real one.</p>
+<p>Let&rsquo;s take a second look at the output of INDXParse:</p>
+<p><img loading="lazy" src="images/indxparse_output.png" alt=""  />
+</p>
+<ul>
+<li>As we have just seen, the creation time in the false entry - <code>54 2B 00 00 00 00 D1 01</code>, matches the creation time in the third output line, and is actually the parent directory reference in the real entry.</li>
+</ul>
+<p><!-- raw HTML omitted --><!-- raw HTML omitted --></p>
+<ul>
+<li>The physical size in the false entry (marked in brown) matches the physical size in the third output line (~118 petabytes). This value is the last access time in the real entry, which explains why it is so ridiculous as a file size.</li>
+</ul>
+<p><!-- raw HTML omitted --><!-- raw HTML omitted --></p>
+<ul>
+<li>The filename (marked in blue) starts with 0x04, which is an EOT character. Then there&rsquo;s 0x6F, which is a lowercase O, and 0x0D - a carriage return character (CR), which excel interprets as a new line. This character sequence is actually the second output line.</li>
+</ul>
+<p><!-- raw HTML omitted --><!-- raw HTML omitted --></p>
+<ul>
+<li>The rest of the filename is in the third output line. It&rsquo;s cut-off, because the filename length in the false entry (marked in red) is a lot shorter than the real one.</li>
+</ul>
+<h2 id="avoiding-false-entries">Avoiding False Entries</h2>
+<p>Unfortunately, false entries cannot be entirely avoided. When carving data from an unstructured binary blob, there&rsquo;s always a risk of false positives. Nevertheless, the false positive rate can be reduced with more in-depth validation of the carved data.</p>
+<p>The false entry shown above can be easily identified as one:</p>
+<ul>
+<li>The filename contains control characters. While most of the characters in the Unicode &ldquo;Control&rdquo; category are allowed in filenames, they are very rarely used in them.</li>
+</ul>
+<p><!-- raw HTML omitted --><!-- raw HTML omitted --></p>
+<ul>
+<li>The file&rsquo;s physical size, besides being absolutely ridiculous, is not a multiple of the file-system&rsquo;s cluster size. This is an obvious red flag.</li>
+</ul>
+<p>I implemented similar validations in <em>my</em> tool, INDXRipper - so in this case, it ignores the false entry and outputs the real one, as it should. Those validations aren&rsquo;t foolproof, though. $I30 slack space is unpredictable, so there&rsquo;s always a chance they will fail.</p>
+]]></content:encoded>
+    </item>
+    
     <item>
       <title>The Forensic Value of the (Other) WSH Registry Key</title>
       <link>https://harelsegev.github.io/posts/the-forensic-value-of-the-other-wsh-registry-key/</link>

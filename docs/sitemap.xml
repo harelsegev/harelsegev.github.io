@@ -2,25 +2,37 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
   xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
-    <loc>https://harelsegev.github.io/categories/artifacts/</loc>
-    <lastmod>2022-10-13T00:00:00+00:00</lastmod>
+    <loc>https://harelsegev.github.io/tags/i30/</loc>
+    <lastmod>2022-10-29T00:00:00+00:00</lastmod>
+  </url><url>
+    <loc>https://harelsegev.github.io/posts/i30-parsers-output-false-entries.-heres-why/</loc>
+    <lastmod>2022-10-29T00:00:00+00:00</lastmod>
   </url><url>
     <loc>https://harelsegev.github.io/categories/</loc>
-    <lastmod>2022-10-13T00:00:00+00:00</lastmod>
+    <lastmod>2022-10-29T00:00:00+00:00</lastmod>
   </url><url>
-    <loc>https://harelsegev.github.io/tags/cscript/</loc>
-    <lastmod>2022-10-13T00:00:00+00:00</lastmod>
+    <loc>https://harelsegev.github.io/tags/ntfs/</loc>
+    <lastmod>2022-10-29T00:00:00+00:00</lastmod>
+  </url><url>
+    <loc>https://harelsegev.github.io/categories/parsing/</loc>
+    <lastmod>2022-10-29T00:00:00+00:00</lastmod>
   </url><url>
     <loc>https://harelsegev.github.io/posts/</loc>
-    <lastmod>2022-10-13T00:00:00+00:00</lastmod>
+    <lastmod>2022-10-29T00:00:00+00:00</lastmod>
   </url><url>
     <loc>https://harelsegev.github.io/</loc>
+    <lastmod>2022-10-29T00:00:00+00:00</lastmod>
+  </url><url>
+    <loc>https://harelsegev.github.io/tags/</loc>
+    <lastmod>2022-10-29T00:00:00+00:00</lastmod>
+  </url><url>
+    <loc>https://harelsegev.github.io/tags/cscript/</loc>
     <lastmod>2022-10-13T00:00:00+00:00</lastmod>
   </url><url>
     <loc>https://harelsegev.github.io/tags/registry/</loc>
     <lastmod>2022-10-13T00:00:00+00:00</lastmod>
   </url><url>
-    <loc>https://harelsegev.github.io/tags/</loc>
+    <loc>https://harelsegev.github.io/categories/research/</loc>
     <lastmod>2022-10-13T00:00:00+00:00</lastmod>
   </url><url>
     <loc>https://harelsegev.github.io/posts/the-forensic-value-of-the-other-wsh-registry-key/</loc>
@@ -32,26 +44,14 @@
     <loc>https://harelsegev.github.io/tags/heapleakdetection/</loc>
     <lastmod>2022-07-20T00:00:00+00:00</lastmod>
   </url><url>
-    <loc>https://harelsegev.github.io/categories/reverse-engineering/</loc>
-    <lastmod>2022-07-20T00:00:00+00:00</lastmod>
-  </url><url>
     <loc>https://harelsegev.github.io/posts/the-mystery-of-the-heapleakdetection-registry-key/</loc>
     <lastmod>2022-07-20T00:00:00+00:00</lastmod>
   </url><url>
     <loc>https://harelsegev.github.io/tags/mft/</loc>
     <lastmod>2022-07-07T00:00:00+00:00</lastmod>
   </url><url>
-    <loc>https://harelsegev.github.io/tags/ntfs/</loc>
-    <lastmod>2022-07-07T00:00:00+00:00</lastmod>
-  </url><url>
-    <loc>https://harelsegev.github.io/categories/parsing/</loc>
-    <lastmod>2022-07-07T00:00:00+00:00</lastmod>
-  </url><url>
     <loc>https://harelsegev.github.io/posts/resolving-file-paths-using-the-mft/</loc>
     <lastmod>2022-07-07T00:00:00+00:00</lastmod>
-  </url><url>
-    <loc>https://harelsegev.github.io/tags/i30/</loc>
-    <lastmod>2022-07-02T00:00:00+00:00</lastmod>
   </url><url>
     <loc>https://harelsegev.github.io/categories/home-adventures/</loc>
     <lastmod>2022-07-02T00:00:00+00:00</lastmod>

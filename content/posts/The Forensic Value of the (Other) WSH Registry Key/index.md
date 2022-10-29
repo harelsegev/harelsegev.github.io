@@ -3,7 +3,7 @@ title: "The Forensic Value of the (Other) WSH Registry Key"
 date: "2022-10-13"
 author: "Harel Segev"
 tags: ["Registry", "WScript", "CScript"]
-categories: ["Artifacts"]
+categories: ["Research"]
 draft: false
 ---
 

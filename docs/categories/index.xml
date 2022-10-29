@@ -5,33 +5,23 @@
     <link>https://harelsegev.github.io/categories/</link>
     <description>Recent content in Categories on RAT In Mi Kitchen</description>
     <generator>Hugo -- gohugo.io</generator>
-    <lastBuildDate>Thu, 13 Oct 2022 00:00:00 +0000</lastBuildDate><atom:link href="https://harelsegev.github.io/categories/index.xml" rel="self" type="application/rss+xml" />
-    <item>
-      <title>Artifacts</title>
-      <link>https://harelsegev.github.io/categories/artifacts/</link>
-      <pubDate>Thu, 13 Oct 2022 00:00:00 +0000</pubDate>
-      
-      <guid>https://harelsegev.github.io/categories/artifacts/</guid>
-      <description></description>
-      <content:encoded><![CDATA[]]></content:encoded>
-    </item>
-    
-    <item>
-      <title>Reverse Engineering</title>
-      <link>https://harelsegev.github.io/categories/reverse-engineering/</link>
-      <pubDate>Wed, 20 Jul 2022 00:00:00 +0000</pubDate>
-      
-      <guid>https://harelsegev.github.io/categories/reverse-engineering/</guid>
-      <description></description>
-      <content:encoded><![CDATA[]]></content:encoded>
-    </item>
-    
+    <lastBuildDate>Sat, 29 Oct 2022 00:00:00 +0000</lastBuildDate><atom:link href="https://harelsegev.github.io/categories/index.xml" rel="self" type="application/rss+xml" />
     <item>
       <title>Parsing</title>
       <link>https://harelsegev.github.io/categories/parsing/</link>
-      <pubDate>Thu, 07 Jul 2022 00:00:00 +0000</pubDate>
+      <pubDate>Sat, 29 Oct 2022 00:00:00 +0000</pubDate>
       
       <guid>https://harelsegev.github.io/categories/parsing/</guid>
+      <description></description>
+      <content:encoded><![CDATA[]]></content:encoded>
+    </item>
+    
+    <item>
+      <title>Research</title>
+      <link>https://harelsegev.github.io/categories/research/</link>
+      <pubDate>Thu, 13 Oct 2022 00:00:00 +0000</pubDate>
+      
+      <guid>https://harelsegev.github.io/categories/research/</guid>
       <description></description>
       <content:encoded><![CDATA[]]></content:encoded>
     </item>

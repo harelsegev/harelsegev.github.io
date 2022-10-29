@@ -3,12 +3,11 @@ title: "RAT In Mi Kitchen"
 paginate: 5
 theme: "PaperMod"
 publishDir: "docs"
-
 enableRobotsTXT: true
 
 params:
   env: production
-  title: "RAT In Mi Kitchen"
+  description: "my DFIR blog"
   keywords: ["Blog", "DFIR"]
   DateFormat: "January 2, 2006"
   author: "Harel Segev"
@@ -22,6 +21,7 @@ params:
   ShowWordCount: true
   ShowRssButtonInSectionTermList: true
   ShowFullTextinRSS: true
+  ShowAllPagesInArchive: true
   UseHugoToc: true
   disableSpecial1stPost: false
   disableScrollToTop: false
